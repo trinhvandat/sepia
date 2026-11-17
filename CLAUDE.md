@@ -61,15 +61,11 @@ sepia/
 
 ## Mốc hiện tại & việc kế tiếp
 
-- **Hiện tại**: **Mốc 2 XONG & đã kiểm trên emulator Android (API 36).** App đọc EPUB: nhập qua SAF, khử
-  trùng/thay file theo `bookUid`, lưu `Book` (SQLDelight + Koin); màn đọc **foliate-js trong WebView**
-  (vendor pin SHA, WebViewAssetLoader qua https appassets — tránh CORS `file://`) sau interface
-  `ReaderController`/`ReaderEvent` (ADR-001); theme Sepia qua CSS + cỡ chữ; nhớ vị trí (debounce) + re-anchor
-  vị trí đọc trong JS (ADR-008). Kiểm thực tế: render EPUB tiếng Việt nền sepia, chạm phải sang trang,
-  thoát/mở lại đúng trang → **ADR-001 ĐÓNG (giữ foliate-js)**. `:androidApp:assembleDebug` + 19 unit test +
-  iOS(sim) compile xanh. Mốc 1 (pipeline `scan_ocr`→EPUB) vẫn như cũ; **chưa đọc thử KOReader**.
-  *(IDE cần Android Studio 2026 ≥ Rabbit để sync AGP 9.)*
-- **Việc kế tiếp**: **Mốc 3** — chọn văn bản → highlight + ghi chú + xuất Markdown/DB. **Nợ từ Mốc 2 phải
-  xử trước**: lớp chạm Compose phủ WebView chặn nhấn-giữ chọn chữ → chuyển cử chỉ sang JS hoặc cho long-press
-  xuyên qua (xem docs/07 Mốc 3). Nhân tiện **đọc thử EPUB bằng KOReader** chốt ngưỡng heuristic.
+- **Hiện tại**: **đã phát hành v0.1.0** (2026-10-29) — đọc EPUB trên Android, highlight nhiều màu, mục lục
+  dạng cây + thanh tiến độ + quay lại, lật trang mượt, content pack đóng gói sách vào APK (ADR-010); pipeline
+  **v11** OCR lại sách scan bằng Apple Vision + cache (ADR-009). Chi tiết: [07-roadmap.md](./docs/07-roadmap.md)
+  mục "Lộ trình theo bản phát hành".
+- **Việc kế tiếp**: **v0.2 — An toàn dữ liệu**: thống nhất khoá ký release cho mọi bản cài + sao lưu keystore;
+  xuất Markdown + xuất/nhập DB (Mốc 3d); re-anchor highlight xuyên bản build, orphan không xoá (Mốc 3e).
+  Sau đó v0.3 (ghi chú, màn "Ghi chú của tôi", bookmark) → v0.4 (theme, độ sáng/ấm, thư viện).
 - **Việc riêng đang mở**: **iOS shell** (SPIKE-2 phần iOS) — chưa build iOS lần nào, chưa có `.xcodeproj` (chưa cài Xcode) → **[issue #3](https://github.com/trinhvandat/sepia/issues/3)**, xem `iosApp/README.md`. Xem [07-roadmap.md](./docs/07-roadmap.md).

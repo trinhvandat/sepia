@@ -3,7 +3,63 @@
 > ~10 giờ/tuần. Chia theo **mốc (milestone)**, mỗi mốc ghi **tổng giờ ước tính** và quy ra **số tuần** ở nhịp 10h/tuần. Mỗi đầu việc có ước tính giờ riêng.
 > Nguyên tắc: **mỗi mốc ra một bản dùng được**.
 > **Bạn chưa từng build iOS** → mọi việc iOS đã **cộng thêm giờ**.
-> Cập nhật: 2026-10-26.
+> Cập nhật: 2026-10-29 (sau phát hành **v0.1.0**).
+
+## Lộ trình theo bản phát hành (từ v0.1.0)
+
+> Từ khi có bản phát hành, kế hoạch đi theo **phiên bản** (mỗi bản dùng được hằng ngày trên điện thoại).
+> Các mốc 0–5 bên dưới giữ làm lịch sử + chi tiết; bảng này là **thứ tự làm thực tế**. Ước tính đã gồm
+> kiểm trên emulator/Vivo. Thứ tự ưu tiên: **an toàn dữ liệu → học với sách → dễ đọc**.
+
+### ✅ v0.1.0 — bản dogfood đầu tiên (2026-10-29)
+Đọc EPUB trên Android (theme Sepia, cỡ chữ, nhớ vị trí, re-anchor khi cập nhật sách), highlight nhiều màu
+(3b), điều hướng (mục lục dạng cây + tìm, thanh tiến độ, quay lại sau cú nhảy), lật trang mượt (trượt,
+không bật về), content pack đóng gói sách vào APK (ADR-010). Pipeline **v11**: sách scan OCR lại bằng
+Apple Vision lúc ingest + cache (ADR-009; WER ~15% → ~4% trên sách mẫu), lọc tiêu đề chạy/mục lục in
+sẵn/ký tự rác, chia ~10k ký tự/file, nav theo chương. Phát hành qua tag `v*` → GitHub Release (APK ký
+release, **không kèm sách**).
+
+### v0.2 — An toàn dữ liệu · ~8–10h (~1 tuần)
+> **Bản dùng được**: đọc + tô hằng ngày mà không sợ mất dữ liệu.
+- [ ] **Thống nhất khoá ký**: mọi bản cài lên máy cá nhân (kể cả bản kèm content pack) ký **khoá release**;
+  hướng dẫn sao lưu keystore (3 nơi — mất khoá = không cập nhật được); chuyển máy đang chạy bản debug sang
+  release **một lần** (xuất dữ liệu trước nếu đã có). **1.5h**
+- [ ] **Xuất Markdown** theo [04 §4](./04-data-model.md) (gồm highlight orphan) + **xuất/nhập file DB**
+  qua SAF/share (gộp theo bookUid/id, không nhân đôi). *(Mốc 3d)* **4h**
+- [ ] **Re-anchor highlight xuyên bản build** (exact → gần progress mức vị trí; không thấy → `orphan`,
+  **không xoá**, vẫn hiện + vẫn xuất); kiểm thật bản cũ → bản mới. *(Mốc 3e)* **3h**
+- [ ] Quy trình phát hành: tăng `versionCode`/`versionName`, `CHANGELOG.md`, tag. Đóng issue #20 (đã sửa ở v9). **0.5h**
+
+### v0.3 — Học với sách · ~10–14h (~1–1.5 tuần)
+> **Bản dùng được**: đọc để học — đánh dấu, ghi chú, xem lại.
+- [ ] **Ghi chú gõ phím** gắn highlight (trường `note`). *(Mốc 3c)* **3h**
+- [ ] Màn **"Ghi chú của tôi"** theo sách: lọc theo màu, chạm để nhảy tới chỗ, highlight orphan vẫn hiện. **4h**
+- [ ] **Bookmark** nhanh (kind=`bookmark`) + danh sách bookmark trong mục lục. **2h**
+- [ ] Chip "Quay lại" bấm được ở giữa màn hình (overlay Compose như thanh chọn chữ) nếu còn lỗi. **1h**
+
+### v0.4 — Dễ đọc · ~14–16h (~1.5 tuần) *(= Mốc 4)*
+> **Bản dùng được**: đọc lâu không mỏi mắt, quản lý nhiều sách.
+- [ ] Theme **Giấy / Sepia / Đêm / E-ink** qua CSS tokens. **4h**
+- [ ] **Độ sáng + độ ấm** bằng lớp phủ Compose toàn app, không chặn chạm (02 §8). **3h**
+- [ ] **Giãn dòng / lề / font** (font theo `VariantConfig`). **3h**
+- [ ] Thư viện: bìa, tiến độ đọc, sắp xếp, ẩn/xoá. **4h**
+
+### Song song — Pipeline dùng được cho nhiều sách
+- [ ] Thêm **2–3 sách mẫu** (1 PDF chữ sạch born-digital, 1 scan khác nguồn) → kiểm đường heuristic +
+  Vision trên sách thật (sách **không vào git**).
+- [ ] **Thứ tự đọc trang nhiều cột** khi Docling phủ bố cục thưa (issue #18; thân bài tách khỏi heading,
+  dòng trôi ~8%).
+- [ ] Lệnh một bước `sepia-pipeline build <pdf>` (detect → OCR nếu scan → convert) + đọc thử KOReader.
+
+### Sau v0.4
+iOS (issue #3, xem Mốc 5+); tính năng riêng biến thể Đông y ([variants/dongy.md](./variants/dongy.md));
+app tự nhận PDF trực tiếp (vẫn đóng băng — xem "Giai đoạn sau").
+
+### Thói quen dogfood
+Mỗi chỗ khó chịu khi đọc trên điện thoại → GitHub issue nhãn **`dogfood`** (ảnh chụp + trang). Mỗi tuần
+chọn **top 3** đưa vào bản đang làm. Kế hoạch trên được chỉnh theo danh sách này.
+
+---
 
 ## Hai nhánh song song
 
@@ -53,6 +109,9 @@ graph TD
 ## Mốc 1 — Pipeline ra EPUB sạch, đọc bằng KOReader · ~24h (~2.5 tuần) · [Pipeline]
 
 > **Bản dùng được**: bạn đọc được sách thật trong kho của mình ở chế độ reflow, chưa cần app Sepia.
+>
+> **Cập nhật 2026-10-29**: `scan_ocr` nay **OCR lại bằng Apple Vision + bố cục Docling** (pipeline
+> v11, ADR-009) — xem "Lộ trình theo bản phát hành" ở đầu file. Ghi chú dưới là trạng thái lúc Mốc 1b.
 >
 > **Trạng thái**: **XONG cho sách `scan_ocr`** (Docling) — mẫu `Tự Học Đông Y - Bùi Huy.pdf` (scan
 > ABBYY FineReader 11) ra EPUB **epubcheck hợp lệ, tất định**, độ phủ chữ **~96%**, 7 file XHTML,

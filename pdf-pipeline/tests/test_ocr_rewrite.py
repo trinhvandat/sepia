@@ -91,3 +91,21 @@ def test_fix_token_short_token_skipped():
     out, rule = fix_token("đ", TABLE, CFG)
     assert out == "đ"
     assert rule is None
+
+
+def test_fix_token_garbage_short_circuits_before_confusion():
+    # Regression: garbage stripping must win before confusion search runs.
+    # Token: "nhiề»u" (» is garbage; stripped → "nhiều" is valid)
+    # Create a ConfusionTable where the stripped form ALSO has a character
+    # that confusion could map to another valid syllable (e.g., "ề" → "ế").
+    # With the bug: both "nhiều" (from garbage) and "nhiếu" (from confusion)
+    # would be in valid set → ambiguous → kept unfixed.
+    # With the fix: garbage short-circuits → returns "nhiều" with rule="garbage".
+    hybrid_table = dataclasses.replace(
+        ConfusionTable.default(),
+        confusions={"»": (), "ề": ("ế",)},  # » is garbage (empty target), ề→ế for confusion
+        garbage_chars=frozenset({"»"}),
+    )
+    out, rule = fix_token("nhiề»u", hybrid_table, CFG)
+    assert out == "nhiều"
+    assert rule == "garbage"  # Must be "garbage", not None (ambiguous)

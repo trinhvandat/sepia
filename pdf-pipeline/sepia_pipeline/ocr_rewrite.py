@@ -105,7 +105,7 @@ def _gen_candidates(token: str, table: ConfusionTable, config: RewriteConfig) ->
         nxt: set[str] = set()
         for cand in frontier:
             for i, ch in enumerate(cand):
-                for repl in table.confusions.get(ch, ()):  # type: ignore[union-attr]
+                for repl in table.confusions.get(ch, ()):
                     new = cand[:i] + repl + cand[i + 1 :]
                     if new not in seen:
                         seen.add(new)
@@ -129,15 +129,14 @@ def fix_token(token: str, table: ConfusionTable, config: RewriteConfig) -> tuple
         return token, None
 
     washed = _strip_garbage(low, table.garbage_chars)
-    rule = "confusion"
-    valid: set[str] = set()
     if washed != low and is_vietnamese_syllable(washed):
-        valid.add(washed)
-        rule = "garbage"
+        return _restore_case(washed, token), "garbage"
+
+    valid: set[str] = set()
     for cand in _gen_candidates(washed, table, config):
         if cand != low and is_vietnamese_syllable(cand):
             valid.add(cand)
 
     if len(valid) == 1:
-        return _restore_case(next(iter(valid)), token), rule
+        return _restore_case(next(iter(valid)), token), "confusion"
     return token, None  # 0 hoặc >1 (mơ hồ) → giữ nguyên

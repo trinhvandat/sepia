@@ -37,11 +37,7 @@ class ConfusionTable:
         confusions = {k: tuple(v) for k, v in conf.get("confusions", {}).items()}
         overrides_dict = exc.get("overrides", {})
         protected_list = overrides_dict.get("protected", [])
-        overrides = {
-            k.casefold(): v
-            for k, v in overrides_dict.items()
-            if k != "protected"
-        }
+        overrides = {k.casefold(): v for k, v in overrides_dict.items() if k != "protected"}
         return cls(
             confusions=confusions,
             garbage_chars=frozenset(conf.get("garbage_chars", [])),
@@ -52,9 +48,10 @@ class ConfusionTable:
     @classmethod
     def default(cls) -> ConfusionTable:
         data = resources.files("sepia_pipeline") / "data"
-        with resources.as_file(data / "ocr_confusion.toml") as cpath, resources.as_file(
-            data / "ocr_exceptions.toml"
-        ) as epath:
+        with (
+            resources.as_file(data / "ocr_confusion.toml") as cpath,
+            resources.as_file(data / "ocr_exceptions.toml") as epath,
+        ):
             return cls.load(cpath, epath)
 
 

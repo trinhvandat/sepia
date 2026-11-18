@@ -101,9 +101,7 @@ def should_prefer_image_ocr(doc_model: Document, *, vn_floor: float = 0.75) -> b
     Điều kiện: sách là tiếng Việt (``looks_vietnamese``) NHƯNG ``vietnamese_score`` thấp (lỗi dấu hệ
     thống của lớp chữ ẩn). Sách born-digital sạch có điểm cao → trả False (giữ lớp text PDF).
     """
-    text = " ".join(
-        s.text for p in doc_model.pages for ln in p.lines for s in ln.spans
-    )
+    text = " ".join(s.text for p in doc_model.pages for ln in p.lines for s in ln.spans)
     if not looks_vietnamese(text):
         return False
     return vietnamese_score(text) < vn_floor
@@ -274,9 +272,7 @@ def convert_pdf(
     if is_ocr_source and looks_vietnamese(pre_text):
         from .ocr_rewrite import ConfusionTable, RewriteConfig, fix_ocr_blocks
 
-        blocks, rewrite_report = fix_ocr_blocks(
-            blocks, ConfusionTable.default(), RewriteConfig()
-        )
+        blocks, rewrite_report = fix_ocr_blocks(blocks, ConfusionTable.default(), RewriteConfig())
         if rewrite_report.corrected:
             warnings.append(f"ocr-rewrite: sửa {rewrite_report.corrected} token")
 

@@ -63,9 +63,7 @@ def test_prefer_image_ocr_when_vietnamese_but_low_score():
     # mặc định (min_real_chars=8) — NHƯNG lớp text hỏng dấu hệ thống nên điểm âm tiết vẫn thấp
     # (0.4 < 0.75).
     assert (
-        should_prefer_image_ocr(
-            _doc("phưdng thuóc nhiéu trưđc ngưài vớư bệnh nhưn đều khỏi")
-        )
+        should_prefer_image_ocr(_doc("phưdng thuóc nhiéu trưđc ngưài vớư bệnh nhưn đều khỏi"))
         is True
     )
 

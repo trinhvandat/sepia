@@ -191,6 +191,26 @@ Lý do: tối đa hóa chia sẻ code và né viết Swift/tích hợp 2 toolkit
 
 ---
 
+## ADR-011 — Sửa lỗi OCR **3 lớp** (Vision + luật + LLM opt-in), **LLM mặc định offline**
+
+**Bối cảnh**: sách scan OCR (ABBYY FineReader) hoặc sách born-digital có **lỗi OCR hệ thống**: dấu tiếng Việt sai (vd ă→a, ơ→o), chữ dính nhau. Một số lỗi chỉ sai **một dấu vẫn hợp lệ** (token sau chuyển mã vẫn thuộc bảng từ tiếng Việt) → **không có cách giải quyết tất định duy nhất**; cần **đọc hiểu ngữ cảnh** mới phân biệt. Vd: `há` (tên) vs `hã` (động từ) đều hợp lệ; `hà` (sông) vs `há` (tên/động từ) cũng hợp lệ.
+
+**Phương án**: ba lớp sửa (xem [03-pdf-pipeline.md](./03-pdf-pipeline.md) §8–8.1):
+- **A. Chỉ luật (Lớp 1)** — tất định, offline, nhưng bỏ sót lỗi dấu hợp lệ.
+- **B. Luật + LLM (Lớp 1 + 2)** — Lớp 2 bật `--llm-proofread` lúc build, **online, gửi mạng** → chối NFR-2/6 (offline-first, không tài khoản).
+- **C. Luật + LLM opt-in** — Lớp 2 **mặc định OFF** (tất định, offline), bật bằng cờ `--llm-proofread` **chỉ khi tác giả chạy trên máy** → **app vẫn offline tuyệt đối** (NFR-2/6). **Chọn.**
+
+**Quyết định**:
+- **Lớp 0 (Vision, nếu có)**: nếu `should_prefer_image_ocr` kích (PDF là tiếng Việt nhưng `vietnamese_score < 0.75` + có cache Vision) → dùng lớp chữ từ Vision. PIPELINE_VERSION không đổi ở bước này (bump 11→12 ghi ở Lớp 1).
+- **Lớp 1 (rule-based)**: `sepia_pipeline/ocr_rewrite.py`, **bảng confusion** `data/ocr_confusion.toml` + **ngoại lệ**. Chỉ sửa token **KHÔNG phải âm tiết tiếng Việt hợp lệ** VÀ **chỉ khi chính xác một ứng viên hợp lệ** → **giữ nguyên văn bản** nếu không chắc. **Lớp 1 mặc định BẬT, tất định, offline.** PIPELINE_VERSION 11→12.
+- **Lớp 2 (LLM "chép lại" khối nghi ngờ)**: `sepia_pipeline/proofread.py` gọi **Anthropic API** (online, `--llm-proofread` chỉ khi tác giả chạy trên máy). **Mặc định TẮT**; bật = opt-in. Có **chốt chặn drift** chống ảo giác (so kích thước output, số dòng, etc.). **Chỉ gửi khi bật, log trang đã gửi** → privacy thoả.
+- **Pipeline chạy trên máy tác giả, tách rời app** (ADR-004) → **app KMP không link Lớp 2**, vẫn offline tuyệt đối.
+
+**Ràng buộc license**: không đổi — pipeline (AGPL, ADR-004) vẫn tách rời app. `proofread.py` gọi API Anthropic (không phân phối) → không thêm ràng buộc license.
+**Điểm lật ngược**: nếu Lớp 1 còn sót nhiều lỗi dấu hợp lệ → thêm bộ từ điển mở (OpenLexicon…) để xác minh token có phải từ Việt; sau đó bọc API từ điển vào Lớp 2.
+
+---
+
 ## Nguồn (kiểm tra 2026-10-25)
 - Kotlin / Compose MP: kotlinlang.org/docs/releases.html; kotlinlang.org/docs/multiplatform/compose-compatibility-and-versioning.html
 - Room KMP: developer.android.com/jetpack/androidx/releases/room; developer.android.com/kotlin/multiplatform/room

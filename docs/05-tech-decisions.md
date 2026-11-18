@@ -201,7 +201,7 @@ Lý do: tối đa hóa chia sẻ code và né viết Swift/tích hợp 2 toolkit
 - **C. Luật + LLM opt-in** — Lớp 2 **mặc định OFF** (tất định, offline), bật bằng cờ `--llm-proofread` **chỉ khi tác giả chạy trên máy** → **app vẫn offline tuyệt đối** (NFR-2/6). **Chọn.**
 
 **Quyết định**:
-- **Lớp 0 (Vision, nếu có)**: nếu `should_prefer_image_ocr` kích (PDF là tiếng Việt nhưng `vietnamese_score < 0.75` + có cache Vision) → dùng lớp chữ từ Vision. PIPELINE_VERSION vẫn 12 (Lớp 0 thuộc quyết định ADR-009, không lặp).
+- **Lớp 0 (Vision, nếu có)**: nếu `should_prefer_image_ocr` kích (PDF là tiếng Việt nhưng `vietnamese_score < 0.75` + có cache Vision) → dùng lớp chữ từ Vision. PIPELINE_VERSION không đổi ở bước này (bump 11→12 ghi ở Lớp 1).
 - **Lớp 1 (rule-based)**: `sepia_pipeline/ocr_rewrite.py`, **bảng confusion** `data/ocr_confusion.toml` + **ngoại lệ**. Chỉ sửa token **KHÔNG phải âm tiết tiếng Việt hợp lệ** VÀ **chỉ khi chính xác một ứng viên hợp lệ** → **giữ nguyên văn bản** nếu không chắc. **Lớp 1 mặc định BẬT, tất định, offline.** PIPELINE_VERSION 11→12.
 - **Lớp 2 (LLM "chép lại" khối nghi ngờ)**: `sepia_pipeline/proofread.py` gọi **Anthropic API** (online, `--llm-proofread` chỉ khi tác giả chạy trên máy). **Mặc định TẮT**; bật = opt-in. Có **chốt chặn drift** chống ảo giác (so kích thước output, số dòng, etc.). **Chỉ gửi khi bật, log trang đã gửi** → privacy thoả.
 - **Pipeline chạy trên máy tác giả, tách rời app** (ADR-004) → **app KMP không link Lớp 2**, vẫn offline tuyệt đối.

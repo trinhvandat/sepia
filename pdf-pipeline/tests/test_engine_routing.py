@@ -59,8 +59,15 @@ def _doc(text: str) -> Document:
 
 
 def test_prefer_image_ocr_when_vietnamese_but_low_score():
-    # tiếng Việt thật nhưng lớp text hỏng dấu hệ thống → điểm âm tiết thấp
-    assert should_prefer_image_ocr(_doc("phưdng thuóc nhiéu trưđc ngưài")) is True
+    # tiếng Việt thật — cố ý ≥8 ký tự Việt "thật" (ư/đ/ớ/ệ/ề/ỏ) để qua cổng looks_vietnamese
+    # mặc định (min_real_chars=8) — NHƯNG lớp text hỏng dấu hệ thống nên điểm âm tiết vẫn thấp
+    # (0.4 < 0.75).
+    assert (
+        should_prefer_image_ocr(
+            _doc("phưdng thuóc nhiéu trưđc ngưài vớư bệnh nhưn đều khỏi")
+        )
+        is True
+    )
 
 
 def test_no_prefer_when_clean_vietnamese():
@@ -69,6 +76,17 @@ def test_no_prefer_when_clean_vietnamese():
 
 def test_no_prefer_when_not_vietnamese():
     assert should_prefer_image_ocr(_doc("the quick brown fox jumps over")) is False
+
+
+def test_no_prefer_when_mostly_english_with_incidental_vn_names():
+    # Chủ yếu tiếng Anh, chỉ có vài ký tự Việt "thật" lạc lõng (tên riêng Đức, Hung) → KHÔNG đủ
+    # ≥8 ký tự để qua cổng looks_vietnamese (bảo vệ chống dương tính giả mà ngưỡng mặc định 8
+    # tạo ra).
+    text = (
+        "The doctor from Da Nang and Hung Yen, Mr. Đức, presented new clinical "
+        "findings about herbal treatment efficacy and dosage over several trials"
+    )
+    assert should_prefer_image_ocr(_doc(text)) is False
 
 
 # --- Tích hợp Docling (skip nếu chưa cài extra) -------------------------------

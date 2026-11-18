@@ -104,12 +104,7 @@ def should_prefer_image_ocr(doc_model: Document, *, vn_floor: float = 0.75) -> b
     text = " ".join(
         s.text for p in doc_model.pages for ln in p.lines for s in ln.spans
     )
-    # `looks_vietnamese` mặc định cần >=8 ký tự Việt "thật" — ngưỡng hợp lý cho CẢ CUỐN sách
-    # (nhiều trang). Ở đây ta đang hỏi "sách CÓ VẼ là tiếng Việt" khi chính lớp dấu đang hỏng hệ
-    # thống (nên phần lớn ký tự có dấu bị mất/lệch) — hạ ngưỡng còn 4 để không bỏ lọt tín hiệu còn
-    # sống sót (vài âm tiết giữ đúng dấu giữa một khối lỗi hệ thống). `vietnamese_score < vn_floor`
-    # bên dưới vẫn chặn dương tính giả: cần điểm thấp thật thì mới ưu tiên Vision.
-    if not looks_vietnamese(text, min_real_chars=4):
+    if not looks_vietnamese(text):
         return False
     return vietnamese_score(text) < vn_floor
 

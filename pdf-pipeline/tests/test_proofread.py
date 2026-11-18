@@ -3,6 +3,7 @@ from sepia_pipeline.proofread import (
     NullProofreader,
     ProofreadConfig,
     _within_drift,
+    make_proofreader,
     proofread_blocks,
     select_suspicious_blocks,
 )
@@ -48,3 +49,8 @@ def test_disabled_and_null_are_noop():
     blocks = [Paragraph(text="x", page=1, confidence=0.1)]
     out, n_llm, _ = proofread_blocks(blocks, NullProofreader(), ProofreadConfig(enabled=False))
     assert out[0].text == "x" and n_llm == 0
+
+
+def test_make_proofreader_null_default():
+    reader = make_proofreader(ProofreadConfig())
+    assert reader.transcribe("abc", None) == "abc"

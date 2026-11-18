@@ -95,6 +95,8 @@ def _cmd_convert(args: argparse.Namespace) -> int:
         font_profile=args.font_profile,
         engine=args.engine,
         run_check=not args.no_check,
+        llm_proofread=args.llm_proofread,
+        llm_provider=args.llm_provider,
     )
     if args.json:
         print(json.dumps(dataclasses.asdict(report), ensure_ascii=False, indent=2))
@@ -184,6 +186,14 @@ def build_parser() -> argparse.ArgumentParser:
         help="Engine trích: auto (docling cho scan_ocr) | heuristic | docling. Mặc định auto.",
     )
     p_convert.add_argument("--no-check", action="store_true", help="Bỏ qua epubcheck (nhanh hơn)")
+    p_convert.add_argument(
+        "--llm-proofread",
+        action="store_true",
+        help="Bật Lớp 2: LLM chép lại khối nghi ngờ (ONLINE, gửi text lên mạng, chậm)",
+    )
+    p_convert.add_argument(
+        "--llm-provider", default="claude", help="Nhà cung cấp LLM (claude). Mặc định claude"
+    )
     p_convert.add_argument("--json", action="store_true", help="In kết quả dạng JSON")
     p_convert.set_defaults(func=_cmd_convert)
 

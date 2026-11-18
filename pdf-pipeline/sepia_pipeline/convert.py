@@ -157,6 +157,8 @@ def convert_pdf(
     config: ConvertConfig | None = None,
     run_check: bool = True,
     ocr_cache_dir: str | Path | None = None,
+    llm_proofread: bool = False,
+    llm_provider: str = "claude",
 ) -> ConvertReport:
     """Chuyển một PDF thành EPUB sạch. Trả :class:`ConvertReport`.
 
@@ -295,6 +297,17 @@ def convert_pdf(
     warnings.extend(toc_h.warnings)
 
     blocks, toc_removed = drop_printed_toc(blocks, config.reflow)
+
+    # Lớp 2 (Spec 1, extra): LLM "chép lại" khối OCR nghi ngờ (ONLINE, opt-in). MẶC ĐỊNH TẮT — chỉ
+    # chạy khi tác giả truyền ``--llm-proofread`` và sách là nguồn OCR. Không ảnh hưởng đường mặc
+    # định/CI (không gọi mạng, không cần cài extra ``llm-online``).
+    if llm_proofread and is_ocr_source:
+        from .proofread import ProofreadConfig, make_proofreader, proofread_blocks
+
+        pcfg = ProofreadConfig(enabled=True, provider=llm_provider)
+        blocks, n_llm, n_rej = proofread_blocks(blocks, make_proofreader(pcfg), pcfg)
+        warnings.append(f"llm-proofread: {n_llm} khối qua LLM, {n_rej} bị bác (drift)")
+
     n_image_pages = sum(1 for b in blocks if isinstance(b, ImageBlock))
     epub_report = build_epub(
         doc_model,

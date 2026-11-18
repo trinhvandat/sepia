@@ -6,12 +6,14 @@ Chỉ đụng token KHÔNG phải âm tiết Việt hợp lệ; chỉ thay khi c
 
 from __future__ import annotations
 
+import dataclasses as _dc
 import re
 import tomllib
 from dataclasses import dataclass
 from importlib import resources
 from pathlib import Path
 
+from .model import Block, Heading, Paragraph
 from .vietnamese import is_vietnamese_syllable
 
 
@@ -140,3 +142,80 @@ def fix_token(token: str, table: ConfusionTable, config: RewriteConfig) -> tuple
     if len(valid) == 1:
         return _restore_case(next(iter(valid)), token), "confusion"
     return token, None  # 0 hoặc >1 (mơ hồ) → giữ nguyên
+
+
+_MAX_SAMPLES = 50
+
+
+@dataclass(frozen=True)
+class Correction:
+    """Một lần sửa token đơn trong văn bản."""
+
+    page: int
+    before: str
+    after: str
+    rule: str
+
+
+@dataclass(frozen=True)
+class RewriteReport:
+    """Báo cáo thống kê sửa lỗi OCR toàn bộ danh sách block."""
+
+    tokens_scanned: int
+    corrected: int
+    ambiguous_left: int
+    invalid_left: int
+    llm_blocks: int = 0
+    llm_rejected: int = 0
+    samples: tuple[Correction, ...] = ()
+
+
+def fix_text(
+    text: str, table: ConfusionTable, config: RewriteConfig, *, page: int = 0
+) -> tuple[str, list[Correction]]:
+    """Sửa một đoạn text, trả (text_mới, danh_sách_sửa).
+
+    Mỗi token hợp lệ được xử lý qua fix_token; phân cách (dấu, khoảng trắng) giữ nguyên.
+    """
+    pieces: list[str] = []
+    corrections: list[Correction] = []
+    for piece, is_word in _tokenize(text):
+        if not is_word:
+            pieces.append(piece)
+            continue
+        new, rule = fix_token(piece, table, config)
+        pieces.append(new)
+        if rule is not None and new != piece:
+            corrections.append(Correction(page=page, before=piece, after=new, rule=rule))
+    return "".join(pieces), corrections
+
+
+def fix_ocr_blocks(
+    blocks: list[Block], table: ConfusionTable, config: RewriteConfig
+) -> tuple[list[Block], RewriteReport]:
+    """Sửa danh sách block (Heading/Paragraph), không đụng ImageBlock/Table.
+
+    Trả (blocks_mới, báo_cáo).
+    """
+    if not config.enabled:
+        return list(blocks), RewriteReport(0, 0, 0, 0)
+    out: list[Block] = []
+    scanned = corrected = 0
+    samples: list[Correction] = []
+    for b in blocks:
+        if isinstance(b, Heading | Paragraph):
+            scanned += sum(1 for _, w in _tokenize(b.text) if w)
+            new_text, corr = fix_text(b.text, table, config, page=b.page)
+            corrected += len(corr)
+            if len(samples) < _MAX_SAMPLES:
+                samples.extend(corr[: _MAX_SAMPLES - len(samples)])
+            out.append(_dc.replace(b, text=new_text) if corr else b)
+        else:
+            out.append(b)
+    return out, RewriteReport(
+        tokens_scanned=scanned,
+        corrected=corrected,
+        ambiguous_left=0,
+        invalid_left=0,
+        samples=tuple(samples),
+    )

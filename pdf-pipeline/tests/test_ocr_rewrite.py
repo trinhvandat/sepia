@@ -3,11 +3,14 @@ from pathlib import Path
 
 import pytest
 
+from sepia_pipeline.model import ImageBlock, Paragraph
 from sepia_pipeline.ocr_rewrite import (
     ConfusionTable,
     RewriteConfig,
     _restore_case,
     _tokenize,
+    fix_ocr_blocks,
+    fix_text,
     fix_token,
 )
 
@@ -109,3 +112,27 @@ def test_fix_token_garbage_short_circuits_before_confusion():
     out, rule = fix_token("nhiề»u", hybrid_table, CFG)
     assert out == "nhiều"
     assert rule == "garbage"  # Must be "garbage", not None (ambiguous)
+
+
+def test_fix_text_preserves_punctuation_and_fixes():
+    out, corr = fix_text("Phưdng thuốc, nhiéu đốt.", TABLE, CFG)
+    assert out == "Phương thuốc, nhiều đốt."
+    assert {c.after for c in corr} == {"Phương", "nhiều"}
+
+
+def test_fix_ocr_blocks_only_text_blocks_and_counts():
+    blocks = [
+        Paragraph(text="Phưdng thuốc", page=3),
+        ImageBlock(png=b"x", page=3),
+    ]
+    out, report = fix_ocr_blocks(blocks, TABLE, CFG)
+    assert out[0].text == "Phương thuốc"
+    assert isinstance(out[1], ImageBlock)  # ảnh không bị đụng
+    assert report.corrected == 1
+    assert report.tokens_scanned >= 2
+
+
+def test_fix_ocr_blocks_disabled_is_noop():
+    blocks = [Paragraph(text="Phưdng", page=1)]
+    out, _ = fix_ocr_blocks(blocks, TABLE, dataclasses.replace(CFG, enabled=False))
+    assert out[0].text == "Phưdng"

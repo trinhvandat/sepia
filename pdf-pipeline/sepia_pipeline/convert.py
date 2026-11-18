@@ -265,10 +265,13 @@ def convert_pdf(
         blocks = tidy_bullet_markers(blocks)
 
     # Lớp 1 (Spec 1): sửa lỗi OCR tiếng Việt bằng luật — tất định, chỉ đụng token đã sai & không mơ
-    # hồ (giữ nguyên văn). Cùng cổng is_ocr_source như tidy/garbage. Sửa TRƯỚC khi tính book_text/
-    # lọc rác để điểm âm tiết cao hơn → giảm bỏ oan.
+    # hồ (giữ nguyên văn). Cổng theo spec/plan: is_ocr_source AND looks_vietnamese (sách không phải
+    # tiếng Việt không nên bị sửa theo luật confusion tiếng Việt). Dùng text hiện tại của blocks
+    # (trước khi tính book_text/lọc rác) để quyết định cổng này. Sửa TRƯỚC khi tính book_text/lọc
+    # rác để điểm âm tiết cao hơn → giảm bỏ oan.
     rewrite_report = None
-    if is_ocr_source:
+    pre_text = " ".join(b.text for b in blocks if isinstance(b, Heading | Paragraph))
+    if is_ocr_source and looks_vietnamese(pre_text):
         from .ocr_rewrite import ConfusionTable, RewriteConfig, fix_ocr_blocks
 
         blocks, rewrite_report = fix_ocr_blocks(

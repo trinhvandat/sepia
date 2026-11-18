@@ -2,6 +2,10 @@
 
 Chỉ đụng token KHÔNG phải âm tiết Việt hợp lệ; chỉ thay khi có ĐÚNG MỘT ứng viên hợp lệ
 (không mơ hồ) → giữ nguyên văn tuyệt đối. Hàm thuần trên ``list[Block]`` bất biến.
+
+Không rửa ký tự rác trong token: ``_tokenize`` (``_WORD_RE``) đã tách trên mọi ký tự rác, nên
+qua đường ống thật ``fix_token`` không bao giờ nhận token lẫn rác. Rác đứng riêng (»/®) đã được
+``reflow.tidy_bullet_markers`` xử lý trước khi tới đây.
 """
 
 from __future__ import annotations
@@ -20,6 +24,8 @@ from .vietnamese import is_vietnamese_syllable
 @dataclass(frozen=True)
 class ConfusionTable:
     confusions: dict[str, tuple[str, ...]]
+    # dự trữ — rác đứng riêng do reflow.tidy_bullet_markers xử lý; rửa rác trong từ hoãn
+    # (bẫy _↔TOC, » guillemet)
     garbage_chars: frozenset[str]
     overrides: dict[str, str]
     protected: frozenset[str]
@@ -90,11 +96,6 @@ class RewriteConfig:
     report_path: Path | None = None
 
 
-def _strip_garbage(token: str, garbage: frozenset[str]) -> str:
-    """Loại bỏ ký tự rác trong token."""
-    return "".join(ch for ch in token if ch not in garbage)
-
-
 def _gen_candidates(token: str, table: ConfusionTable, config: RewriteConfig) -> set[str]:
     """Sinh ứng viên (chữ thường) từ token thường: thay ≤max_substitutions vị trí theo bảng nhầm.
 
@@ -130,12 +131,8 @@ def fix_token(token: str, table: ConfusionTable, config: RewriteConfig) -> tuple
     if is_vietnamese_syllable(low):
         return token, None
 
-    washed = _strip_garbage(low, table.garbage_chars)
-    if washed != low and is_vietnamese_syllable(washed):
-        return _restore_case(washed, token), "garbage"
-
     valid: set[str] = set()
-    for cand in _gen_candidates(washed, table, config):
+    for cand in _gen_candidates(low, table, config):
         if cand != low and is_vietnamese_syllable(cand):
             valid.add(cand)
 

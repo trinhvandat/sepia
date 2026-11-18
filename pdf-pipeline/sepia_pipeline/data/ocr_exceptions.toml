@@ -1,0 +1,4 @@
+# [overrides]: token (sau casefold) -> token đúng. Ưu tiên TRƯỚC luật sinh ứng viên.
+# protected: token (sau casefold) KHÔNG BAO GIỜ đụng, kể cả khi validator coi là rác.
+[overrides]
+protected = ["kcal", "mmhg", "vitamin"]

@@ -1,0 +1,16 @@
+# Ký tự rác loại khỏi token khi sinh ứng viên sửa (OCR đọc nhầm ký hiệu thành các dấu này).
+garbage_chars = ["»", "®", "_", "¬", "~"]
+
+# [confusions]: ký tự OCR -> danh sách ký tự THẬT nó có thể là. Hướng = (ký tự OCR đọc ra) -> (ký tự
+# đúng), seed từ SPIKE-5 (vd ơ bị đọc thành "d": phương->phưdng; ề bị đọc thành "é": nhiều->nhiéu).
+# Duyệt trái→phải, thử theo thứ tự khai báo (tất định).
+#
+# LƯU Ý THIẾT KẾ: validator chỉ biết CẤU TRÚC âm tiết, không biết dấu thanh nào đúng. Nếu một ký tự
+# tone (vd "é") ánh xạ sang NHIỀU mục (ề/ế/ệ) thì mọi biến thể đều hợp lệ về cấu trúc → >1 ứng viên →
+# "mơ hồ" → GIỮ NGUYÊN (không sửa). Vì vậy seed dùng MỘT mục tiêu trội (do curation theo sách). Lỗi
+# tone còn lại thuộc Lớp 2. Ký tự ĐỔI CẤU TRÚC (vd "d"->"ơ") thường cho đúng 1 ứng viên hợp lệ → sửa được.
+[confusions]
+"d" = ["ơ"]
+"é" = ["ề"]
+"ó" = ["ố"]
+"đ" = ["ớ"]

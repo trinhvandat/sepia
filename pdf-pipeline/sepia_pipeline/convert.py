@@ -225,6 +225,19 @@ def convert_pdf(
     if is_ocr_source:
         blocks = tidy_bullet_markers(blocks)
 
+    # Lớp 1 (Spec 1): sửa lỗi OCR tiếng Việt bằng luật — tất định, chỉ đụng token đã sai & không mơ
+    # hồ (giữ nguyên văn). Cùng cổng is_ocr_source như tidy/garbage. Sửa TRƯỚC khi tính book_text/
+    # lọc rác để điểm âm tiết cao hơn → giảm bỏ oan.
+    rewrite_report = None
+    if is_ocr_source:
+        from .ocr_rewrite import ConfusionTable, RewriteConfig, fix_ocr_blocks
+
+        blocks, rewrite_report = fix_ocr_blocks(
+            blocks, ConfusionTable.default(), RewriteConfig()
+        )
+        if rewrite_report.corrected:
+            warnings.append(f"ocr-rewrite: sửa {rewrite_report.corrected} token")
+
     book_text = " ".join(b.text for b in blocks if isinstance(b, Heading | Paragraph))
     if is_ocr_source and looks_vietnamese(book_text):
         garbage = drop_garbage_blocks(blocks, config.reflow)

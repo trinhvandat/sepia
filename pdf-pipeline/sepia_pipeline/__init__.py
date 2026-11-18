@@ -45,6 +45,10 @@ extract/reflow/build_epub thuộc Mốc 1 (xem docs/07-roadmap.md).
 #     thêm Heading.nav_label — KHÔNG đổi chữ thân bài. So khớp bỏ dấu câu (match_key) để chịu OCR
 #     ',' → '.'. Mục con khớp mục lục → cấp 2/3 (khử trùng trong mỗi chương). → nav đổi, CHỮ THÂN
 #     BÀI KHÔNG ĐỔI so với v10.
-PIPELINE_VERSION = 11
+# v12: SỬA LỖI OCR tiếng Việt bằng luật (Lớp 1, Spec 1 CHỮ). Sau tidy_bullet_markers, trước lọc
+#      rác: token KHÔNG phải âm tiết Việt hợp lệ → thử bảng nhầm (ocr_confusion.toml) + rửa ký tự
+#      rác; thay khi có ĐÚNG 1 ứng viên hợp lệ (mơ hồ/0 → giữ nguyên). Gate is_ocr_source. → chữ
+#      thân bài đổi.
+PIPELINE_VERSION = 12
 
 __all__ = ["PIPELINE_VERSION"]

@@ -8,6 +8,8 @@ import pytest
 
 from sepia_pipeline.__main__ import main
 from sepia_pipeline.convert import convert_pdf
+from sepia_pipeline.model import Paragraph
+from sepia_pipeline.ocr_rewrite import ConfusionTable, RewriteConfig, fix_ocr_blocks
 
 
 def _append(tw: fitz.TextWriter, pos, text: str, size: float) -> None:
@@ -108,3 +110,10 @@ def test_cli_convert(book_pdf: Path, tmp_path: Path) -> None:
     rc = main(["convert", str(book_pdf), "-o", str(out), "--no-check"])
     assert rc == 0
     assert out.exists()
+
+
+def test_convert_layer1_fixes_blocks_via_shared_fn():
+    blocks = [Paragraph(text="Phưdng thuốc nhiéu", page=1)]
+    out, report = fix_ocr_blocks(blocks, ConfusionTable.default(), RewriteConfig())
+    assert out[0].text == "Phương thuốc nhiều"
+    assert report.corrected == 2

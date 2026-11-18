@@ -1,6 +1,15 @@
+import dataclasses
 from pathlib import Path
 
-from sepia_pipeline.ocr_rewrite import ConfusionTable, _restore_case, _tokenize
+import pytest
+
+from sepia_pipeline.ocr_rewrite import (
+    ConfusionTable,
+    RewriteConfig,
+    _restore_case,
+    _tokenize,
+    fix_token,
+)
 
 
 def test_confusion_table_default_loads_bundled_data():
@@ -34,3 +43,51 @@ def test_restore_case():
     assert _restore_case("phương", "phưdng") == "phương"
     assert _restore_case("phương", "Phưdng") == "Phương"
     assert _restore_case("phương", "PHƯDNG") == "PHƯƠNG"
+
+
+TABLE = ConfusionTable.default()
+CFG = RewriteConfig()
+
+
+@pytest.mark.parametrize(
+    "wrong, right",
+    [("phưdng", "phương"), ("nhiéu", "nhiều")],
+)
+def test_fix_token_repairs_structure_breaking(wrong, right):
+    out, rule = fix_token(wrong, TABLE, CFG)
+    assert out == right
+    assert rule == "confusion"
+
+
+def test_fix_token_leaves_valid_word_untouched():
+    out, rule = fix_token("phương", TABLE, CFG)
+    assert out == "phương"
+    assert rule is None
+
+
+def test_fix_token_strips_in_word_garbage():
+    out, rule = fix_token("nhiề»u", TABLE, CFG)
+    assert out == "nhiều"
+    assert rule in {"garbage", "confusion"}
+
+
+def test_fix_token_no_valid_candidate_kept():
+    # token không sinh được ứng viên hợp lệ nào (0 ứng viên) → giữ nguyên (an toàn).
+    out, rule = fix_token("xqzw", TABLE, CFG)
+    assert out == "xqzw"
+    assert rule is None
+
+
+def test_fix_token_multi_target_is_ambiguous_kept():
+    # Nếu curation để một ký tự tone ánh xạ ĐA MỤC TIÊU, mọi biến thể hợp lệ cấu trúc → >1 ứng viên
+    # → mơ hồ → giữ nguyên. Dựng bảng tạm để kiểm quy tắc an toàn (không phụ thuộc seed mặc định).
+    multi = dataclasses.replace(ConfusionTable.default(), confusions={"é": ("ề", "ế", "ệ")})
+    out, rule = fix_token("nhiéu", multi, CFG)
+    assert out == "nhiéu"
+    assert rule is None
+
+
+def test_fix_token_short_token_skipped():
+    out, rule = fix_token("đ", TABLE, CFG)
+    assert out == "đ"
+    assert rule is None

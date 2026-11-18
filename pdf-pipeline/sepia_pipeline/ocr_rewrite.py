@@ -12,6 +12,8 @@ from dataclasses import dataclass
 from importlib import resources
 from pathlib import Path
 
+from .vietnamese import is_vietnamese_syllable
+
 
 @dataclass(frozen=True)
 class ConfusionTable:
@@ -73,3 +75,69 @@ def _restore_case(candidate: str, original: str) -> str:
     if original[:1].isupper():
         return candidate[:1].upper() + candidate[1:]
     return candidate
+
+
+@dataclass(frozen=True)
+class RewriteConfig:
+    """Cấu hình sửa lỗi OCR (token-level)."""
+
+    enabled: bool = True
+    min_token_len: int = 2
+    max_substitutions: int = 2
+    max_candidates: int = 64
+    report_path: Path | None = None
+
+
+def _strip_garbage(token: str, garbage: frozenset[str]) -> str:
+    """Loại bỏ ký tự rác trong token."""
+    return "".join(ch for ch in token if ch not in garbage)
+
+
+def _gen_candidates(token: str, table: ConfusionTable, config: RewriteConfig) -> set[str]:
+    """Sinh ứng viên (chữ thường) từ token thường: thay ≤max_substitutions vị trí theo bảng nhầm.
+
+    BFS theo số vị trí đã thay; dừng khi vượt ``max_candidates`` (an toàn: trả những gì đã có).
+    """
+    base = token
+    frontier: set[str] = {base}
+    seen: set[str] = {base}
+    for _depth in range(config.max_substitutions):
+        nxt: set[str] = set()
+        for cand in frontier:
+            for i, ch in enumerate(cand):
+                for repl in table.confusions.get(ch, ()):  # type: ignore[union-attr]
+                    new = cand[:i] + repl + cand[i + 1 :]
+                    if new not in seen:
+                        seen.add(new)
+                        nxt.add(new)
+                        if len(seen) > config.max_candidates:
+                            return seen
+        frontier = nxt
+    return seen
+
+
+def fix_token(token: str, table: ConfusionTable, config: RewriteConfig) -> tuple[str, str | None]:
+    """Trả (token_mới, rule). Chỉ sửa token KHÔNG hợp lệ & khi có ĐÚNG 1 ứng viên hợp lệ."""
+    low = token.casefold()
+    if low in table.protected:
+        return token, None
+    if low in table.overrides:
+        return _restore_case(table.overrides[low], token), "override"
+    if len(token) < config.min_token_len:
+        return token, None
+    if is_vietnamese_syllable(low):
+        return token, None
+
+    washed = _strip_garbage(low, table.garbage_chars)
+    rule = "confusion"
+    valid: set[str] = set()
+    if washed != low and is_vietnamese_syllable(washed):
+        valid.add(washed)
+        rule = "garbage"
+    for cand in _gen_candidates(washed, table, config):
+        if cand != low and is_vietnamese_syllable(cand):
+            valid.add(cand)
+
+    if len(valid) == 1:
+        return _restore_case(next(iter(valid)), token), rule
+    return token, None  # 0 hoặc >1 (mơ hồ) → giữ nguyên

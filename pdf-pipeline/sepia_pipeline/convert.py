@@ -31,7 +31,7 @@ from .reflow import (
     tidy_bullet_markers,
 )
 from .toc_hierarchy import assign_heading_levels
-from .vietnamese import looks_vietnamese
+from .vietnamese import looks_vietnamese, vietnamese_score
 
 DEFAULT_OUT_DIR = Path(__file__).resolve().parent.parent / "out"
 
@@ -93,6 +93,25 @@ def _ocr_cache_status(
         (f"cache OCR Vision có ({len(cache.pages)} trang, {cache.n_lines} dòng) — route hybrid.",),
         cache,
     )
+
+
+def should_prefer_image_ocr(doc_model: Document, *, vn_floor: float = 0.75) -> bool:
+    """True nếu lớp text PDF KHÔNG đáng tin cho sách tiếng Việt → nên OCR lại từ ảnh trang.
+
+    Điều kiện: sách là tiếng Việt (``looks_vietnamese``) NHƯNG ``vietnamese_score`` thấp (lỗi dấu hệ
+    thống của lớp chữ ẩn). Sách born-digital sạch có điểm cao → trả False (giữ lớp text PDF).
+    """
+    text = " ".join(
+        s.text for p in doc_model.pages for ln in p.lines for s in ln.spans
+    )
+    # `looks_vietnamese` mặc định cần >=8 ký tự Việt "thật" — ngưỡng hợp lý cho CẢ CUỐN sách
+    # (nhiều trang). Ở đây ta đang hỏi "sách CÓ VẼ là tiếng Việt" khi chính lớp dấu đang hỏng hệ
+    # thống (nên phần lớn ký tự có dấu bị mất/lệch) — hạ ngưỡng còn 4 để không bỏ lọt tín hiệu còn
+    # sống sót (vài âm tiết giữ đúng dấu giữa một khối lỗi hệ thống). `vietnamese_score < vn_floor`
+    # bên dưới vẫn chặn dương tính giả: cần điểm thấp thật thì mới ưu tiên Vision.
+    if not looks_vietnamese(text, min_real_chars=4):
+        return False
+    return vietnamese_score(text) < vn_floor
 
 
 def _choose_engine(engine: str, is_scan_ocr: bool) -> tuple[str, list[str]]:
@@ -171,29 +190,52 @@ def convert_pdf(
     finally:
         fitz_doc.close()
 
-    # Phát hiện cache OCR Vision (chỉ sách scan_ocr). PR ocr-ingest-cache: CHỈ cảnh báo, chưa tiêu
-    # thụ (route hybrid dùng ở PIPELINE_VERSION 5) → EPUB không đổi so với v4.
+    # Lớp 0 (Spec 1): lớp text PDF tiếng Việt lỗi dấu hệ thống (vd font cũ đọc nhầm) → điểm âm tiết
+    # Việt thấp dù sách rõ ràng là tiếng Việt. Khi đó nên ưu tiên OCR lại từ ảnh trang (Vision) thay
+    # vì tin lớp chữ ẩn — NGAY CẢ KHI sách không bị phân loại ``scan_ocr`` (vd PDF có lớp text,
+    # không phải ảnh scan, nhưng lớp text đó tự nó sai).
+    prefer_image_ocr = should_prefer_image_ocr(doc_model)
+
+    # Phát hiện cache OCR Vision (sách scan_ocr HOẶC lớp text không đáng tin). PR ocr-ingest-cache:
+    # CHỈ cảnh báo, chưa tiêu thụ (route hybrid dùng ở PIPELINE_VERSION 5) → EPUB không đổi so với
+    # v4 cho sách scan_ocr đã có từ trước; Lớp 0 mở rộng thêm trường hợp lớp text hỏng dấu.
     ocr_cache_status = "n/a"
     ocr_cache_obj: OcrCache | None = None
-    if is_scan_ocr:
+    if is_scan_ocr or prefer_image_ocr:
         cache_dir = ocr_cache_dir if ocr_cache_dir is not None else DEFAULT_CACHE_DIR
         ocr_cache_status, cache_warnings, ocr_cache_obj = _ocr_cache_status(
             doc_model.pdf_sha256, cache_dir
         )
-        warnings += cache_warnings
-
-    if engine_used == "docling":
-        # Route HYBRID (ADR-009): có cache Vision hợp lệ → bố cục Docling + chữ Vision theo toạ độ.
-        # Không có cache → giữ lớp chữ ẩn (Docling + ABBYY) như v4.
-        if ocr_cache_status == "present" and ocr_cache_obj is not None:
-            from .ocr_hybrid import extract_blocks_hybrid
-
-            blocks, hybrid_report = extract_blocks_hybrid(pdf_path, ocr_cache_obj)
-            warnings += hybrid_report.warnings
+        if ocr_cache_status == "miss" and not is_scan_ocr:
+            # Không phải scan_ocr nên cảnh báo "miss" mặc định (nói "sách scan_ocr…") không đúng
+            # ngữ cảnh — thay bằng cảnh báo khớp lý do thật (lớp text không đáng tin).
+            warnings.append(
+                "lớp text PDF tiếng Việt có vẻ không đáng tin (điểm âm tiết Việt thấp, lỗi dấu "
+                "hệ thống) nhưng chưa có cache OCR Vision → đang giữ lớp chữ ẩn hiện tại. Chạy "
+                "`sepia-pipeline ocr <pdf>` trên Mac để bật OCR-lại chất lượng cao (SPIKE-5)."
+            )
         else:
-            from .docling_adapter import extract_blocks_docling
+            warnings += cache_warnings
 
-            blocks = extract_blocks_docling(pdf_path)
+    # Route HYBRID (ADR-009, mở rộng Lớp 0): có cache Vision hợp lệ VÀ (sách scan_ocr [đường
+    # Docling như trước] HOẶC lớp text không đáng tin [mới]) → bố cục hiện có + chữ Vision theo toạ
+    # độ. Giữ nguyên hành vi scan_ocr cũ; chỉ OR thêm ``prefer_image_ocr``.
+    use_hybrid_ocr = (
+        ocr_cache_status == "present"
+        and ocr_cache_obj is not None
+        and (engine_used == "docling" or prefer_image_ocr)
+    )
+
+    if use_hybrid_ocr:
+        from .ocr_hybrid import extract_blocks_hybrid
+
+        blocks, hybrid_report = extract_blocks_hybrid(pdf_path, ocr_cache_obj)
+        warnings += hybrid_report.warnings
+    elif engine_used == "docling":
+        # Không có cache → giữ lớp chữ ẩn (Docling + ABBYY) như v4.
+        from .docling_adapter import extract_blocks_docling
+
+        blocks = extract_blocks_docling(pdf_path)
     else:
         warnings += collect_warnings(doc_model, config.reflow)
         n_img_pages = sum(1 for p in doc_model.pages if p.is_image_page)
@@ -221,7 +263,7 @@ def convert_pdf(
     # Đổi dấu đầu dòng OCR sai (»/®) → "• " trước khi lọc rác/mục lục (Việc 3, issue #20).
     # CHỈ áp cho nguồn OCR — sách born-digital có thể dùng »/® thật (vd nháy đóng, đăng ký nhãn
     # hiệu) và không nên bị viết lại.
-    is_ocr_source = is_scan_ocr or engine_used == "docling"
+    is_ocr_source = is_scan_ocr or engine_used == "docling" or use_hybrid_ocr
     if is_ocr_source:
         blocks = tidy_bullet_markers(blocks)
 

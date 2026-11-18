@@ -6,7 +6,8 @@ import pymupdf as fitz
 import pytest
 
 import sepia_pipeline.docling_adapter as da
-from sepia_pipeline.convert import _choose_engine, convert_pdf
+from sepia_pipeline.convert import _choose_engine, convert_pdf, should_prefer_image_ocr
+from sepia_pipeline.model import Document, Line, Page, TextSpan
 
 
 def test_choose_heuristic_forced(monkeypatch) -> None:
@@ -45,6 +46,29 @@ def test_convert_invalid_engine(tmp_path: Path) -> None:
     doc.close()
     with pytest.raises(ValueError):
         convert_pdf(pdf, tmp_path / "o.epub", engine="khong-biet")
+
+
+# --- Lớp 0: trigger Vision khi lớp text PDF không đáng tin -------------------
+
+
+def _doc(text: str) -> Document:
+    span = TextSpan(text=text, font="X", size=10.0)
+    line = Line(page=1, bbox=(0, 0, 100, 10), spans=(span,))
+    page = Page(number=1, width=100, height=100, lines=(line,))
+    return Document(pages=(page,), source_pdf_name="x.pdf", pdf_sha256="s")
+
+
+def test_prefer_image_ocr_when_vietnamese_but_low_score():
+    # tiếng Việt thật nhưng lớp text hỏng dấu hệ thống → điểm âm tiết thấp
+    assert should_prefer_image_ocr(_doc("phưdng thuóc nhiéu trưđc ngưài")) is True
+
+
+def test_no_prefer_when_clean_vietnamese():
+    assert should_prefer_image_ocr(_doc("phương thuốc nhiều trước người đông y")) is False
+
+
+def test_no_prefer_when_not_vietnamese():
+    assert should_prefer_image_ocr(_doc("the quick brown fox jumps over")) is False
 
 
 # --- Tích hợp Docling (skip nếu chưa cài extra) -------------------------------

@@ -74,8 +74,8 @@ _TARGET_CHARS = 7000  # vượt ngưỡng này → tách ở heading coarsest k�
 _MAX_CHARS = 10_000  # trần cứng: vượt → cắt ở ranh giới khối kế tiếp (kể cả giữa chương)
 _NAV_MAX_LEVEL = 3  # v10 (toc_hierarchy): nav tới 3 cấp (chương → mục đánh số → gạch đầu dòng)
 
-# Ảnh: ảnh chụp/scan → JPEG q80, cạnh dài ≤ _IMG_MAX_EDGE; ảnh ít màu (≤ _IMG_PALETTE_MAX màu) giữ
-# PNG. Bỏ ảnh tí hon (cạnh < _IMG_MIN_EDGE px). Pillow là dependency runtime bắt buộc.
+# Ảnh: ảnh chụp/scan → JPEG q82, cạnh dài ≤ _IMG_MAX_EDGE (1800); ảnh ít màu (≤ _IMG_PALETTE_MAX
+# màu) giữ PNG. Bỏ ảnh tí hon (cạnh < _IMG_MIN_EDGE px). Pillow là dependency runtime bắt buộc.
 _IMG_MAX_EDGE = 1800
 _IMG_JPEG_QUALITY = 82
 _IMG_MIN_EDGE = 64

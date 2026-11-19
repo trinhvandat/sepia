@@ -585,7 +585,6 @@ def extract_blocks_hybrid(
         raise RuntimeError(INSTALL_HINT)
     conv = _build_converter(image_scale)
     doc = conv.convert(str(pdf_path)).document
-    fdoc = fitz.open(str(pdf_path))
 
     # 1) Thu các khối theo thứ tự đọc; khối chữ/picture có bbox → target nhận chữ Vision.
     order_items, targets = _build_targets(doc)
@@ -609,6 +608,7 @@ def extract_blocks_hybrid(
     )
 
     # 5) Dựng blocks: trang có cache chỉ dùng chữ Vision (khối rỗng → bỏ); thiếu cache → fallback.
+    fdoc = fitz.open(str(pdf_path))
     try:
         blocks, dropped = _assemble_blocks(
             order_items,

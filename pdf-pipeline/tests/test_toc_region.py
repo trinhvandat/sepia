@@ -93,6 +93,11 @@ def test_mechanism4_drops_toc_region_keeps_real() -> None:
     assert "BƯỚC VÀO THẾ GIỚI ĐÔNG Y" not in texts
     assert "46" not in texts
     assert not any(t.startswith("10. Bệnh tật") for t in texts)
+    # GIỚI HẠN ĐÃ BIẾT (spec §7 rủi ro #1, hướng AN TOÀN): dòng mục lục run-on dạng văn xuôi
+    # (≥60 ký tự không-khoảng-trắng, chữ thường, không khớp _is_toc_entry_text) bị chặn ở ngưỡng
+    # _non_space_len → không trở thành biên, bỏ cùng vùng mục lục. Assert rõ để giới hạn này không
+    # bị che: nếu sau đó nới ngưỡng, dòng sẽ lọt → cần kiểm tra kỹ hơn trước khi thay đổi.
+    assert not any(t.startswith("7. Cách phân biệt") for t in texts)  # dòng này bị bỏ (< 60 ký tự)
 
 
 def test_mechanism4_no_marker_unchanged() -> None:

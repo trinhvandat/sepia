@@ -119,3 +119,9 @@ def test_mechanism4_cap_prevents_runaway() -> None:
     blocks += [Paragraph(text="x", page=1) for _ in range(5)]  # toàn khối ngắn, không biên
     kept, removed = drop_printed_toc(blocks, ReflowConfig(toc_region_max_blocks=3))
     assert len(kept) == len(blocks)  # cap chặn: không gặp biên → giữ hết
+
+
+def test_pipeline_version_bumped_to_14() -> None:
+    from sepia_pipeline import PIPELINE_VERSION
+
+    assert PIPELINE_VERSION == 14

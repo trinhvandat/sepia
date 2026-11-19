@@ -208,6 +208,7 @@ Lý do: tối đa hóa chia sẻ code và né viết Swift/tích hợp 2 toolkit
 
 **Ràng buộc license**: không đổi — pipeline (AGPL, ADR-004) vẫn tách rời app. `proofread.py` gọi API Anthropic (không phân phối) → không thêm ràng buộc license.
 **Điểm lật ngược**: nếu Lớp 1 còn sót nhiều lỗi dấu hợp lệ → thêm bộ từ điển mở (OpenLexicon…) để xác minh token có phải từ Việt; sau đó bọc API từ điển vào Lớp 2.
+**Mở rộng (Mechanism 4)**: `drop_printed_toc` (PIPELINE_VERSION 14) bắt mục lục OCR-vỡ không có dấu-dẫn bằng cách neo theo mốc "MỤC LỤC" (chuẩn hoá bỏ dấu, chịu lỗi dấu), bỏ cả vùng tới khi gặp văn xuôi thật — phối hợp với Lớp 1 để xử lý mục lục in sẵn vỡ trong sách OCR.
 
 ---
 

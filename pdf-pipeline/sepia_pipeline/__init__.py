@@ -53,6 +53,10 @@ extract/reflow/build_epub thuộc Mốc 1 (xem docs/07-roadmap.md).
 #      padding (image_render.crop_figure) thay ảnh Docling ~144 dpi; trim viền trắng. build_epub:
 #      CSS max-height/object-fit + <img width/height>, trần cỡ 1200→1800 (downscale-only), JPEG q82.
 #      → bytes ảnh trong EPUB đổi (cả trang ảnh heuristic do DPI 150→200).
-PIPELINE_VERSION = 13
+# v14: BỎ VÙNG MỤC LỤC IN SẴN (cơ chế 4 drop_printed_toc). Mục lục OCR-vỡ (số trang đứng riêng, mục
+#      không dấu-dẫn, tên chương lặp) không khớp 3 cơ chế cũ → neo theo mốc "MỤC LỤC" (chịu lỗi dấu,
+#      "MỰC LỰC"), bỏ cả vùng tới khi gặp văn xuôi thật; cap chặn ăn lan. → nội dung đổi cho sách có
+#      mục lục in sẵn kiểu vỡ.
+PIPELINE_VERSION = 14
 
 __all__ = ["PIPELINE_VERSION"]

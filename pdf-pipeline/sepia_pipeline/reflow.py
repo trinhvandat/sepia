@@ -50,6 +50,12 @@ class ReflowConfig:
     # tiếp mà run_min bỏ sót. Blob mục lục gộp (≥ 2 dãy chấm dẫn trong một khối) bỏ riêng (không cần
     # run/trang) — xem :func:`drop_printed_toc`.
     toc_page_fraction: float = 0.5
+    # Cơ chế 4 (neo mốc "MỤC LỤC"): từ mốc, bỏ vùng mục lục tới khi gặp văn xuôi
+    # thật (Paragraph ≥ toc_body_min_chars ký tự, có chữ thường, không phải mục
+    # lục/số trang). Cap toc_region_max_blocks chặn ăn lan: quét hết cap mà chưa
+    # gặp biên → KHÔNG bỏ gì (an toàn).
+    toc_body_min_chars: int = 60
+    toc_region_max_blocks: int = 60
     # Tiêu đề thật ngắn: ≤ bấy nhiêu dòng liên tiếp cùng cấp. Nhiều hơn (vd lời giới thiệu in chữ
     # to nhiều dòng) → coi là ĐOẠN VĂN, không phải chuỗi heading.
     max_heading_lines: int = 2
@@ -363,6 +369,45 @@ _STRONG_TOC_RE = re.compile(r"\.{6,}|[_…]\s*\d+\s*$")
 
 def _is_strong_toc(text: str) -> bool:
     return bool(_STRONG_TOC_RE.search(text))
+
+
+# Cơ chế 4: mục lục in sẵn OCR-vỡ (số trang đứng riêng, mục không dấu-dẫn,
+# tên chương lặp) không khớp 3 cơ chế trên. Neo theo mốc "MỤC LỤC" (chịu lỗi
+# dấu: "MỰC LỰC"), bỏ cả vùng tới khi gặp văn xuôi thật.
+def _ascii_fold(text: str) -> str:
+    """Bỏ MỌI dấu (thanh + móc/mũ/breve) + đ/Đ→d/D, hoa hoá.
+
+    'MỤC LỤC'/'MỰC LỰC' → 'MUC LUC'.
+    """
+    s = text.replace("đ", "d").replace("Đ", "D")  # đ không phân rã NFD → map trước
+    s = unicodedata.normalize("NFD", s)
+    s = "".join(ch for ch in s if unicodedata.category(ch) != "Mn")  # bỏ mọi combining mark
+    return unicodedata.normalize("NFC", s).upper()
+
+
+def _is_toc_marker(block: Block) -> bool:
+    """Khối là mốc 'MỤC LỤC' (chịu lỗi dấu).
+
+    So khớp đúng → tự loại câu dài chứa cụm này.
+    """
+    if not isinstance(block, Heading | Paragraph):
+        return False
+    return _ascii_fold(collapse_ws(block.text)).strip() == "MUC LUC"
+
+
+def _is_real_body(block: Block, config: ReflowConfig) -> bool:
+    """Biên kết thúc vùng mục lục: Paragraph văn xuôi thật.
+
+    Dài, có chữ thường, không phải mục lục/số trang.
+    """
+    if not isinstance(block, Paragraph):
+        return False
+    text = block.text
+    if _is_toc_entry_text(text) or is_page_number_line(text):
+        return False
+    if _non_space_len(text) < config.toc_body_min_chars:
+        return False
+    return any(ch.islower() for ch in text)
 
 
 def drop_printed_toc(

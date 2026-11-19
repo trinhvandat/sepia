@@ -12,18 +12,21 @@ Cần extra ``docling`` để lấy bố cục.
 
 from __future__ import annotations
 
+import dataclasses
 import re
 import unicodedata
 from collections import Counter
 from dataclasses import dataclass, field
 from pathlib import Path
 
+import pymupdf as fitz
+
 from .docling_adapter import (
     _caption_text,
     _label,
     _page_no,
-    _png_of,
     docling_available,
+    render_picture,
 )
 from .model import Block, Heading, ImageBlock, Paragraph, Table
 from .ocr_cache import BBox, OcrCache, OcrLine
@@ -401,6 +404,9 @@ def _assemble_blocks(
     cached_pages: set[int],
     *,
     text_in_picture_min_chars: int = TEXT_IN_PICTURE_MIN_CHARS,
+    fdoc=None,
+    image_dpi: int = 200,
+    figure_padding_pt: float = 4.0,
 ) -> tuple[list[Block], int]:
     """Dựng blocks theo thứ tự ``order_items``; chữ từ Vision. Trả ``(blocks, dropped)``.
 
@@ -441,12 +447,17 @@ def _assemble_blocks(
             if _non_space_len(text) >= text_in_picture_min_chars:
                 blocks.append(Paragraph(text=text, page=page, confidence=conf))
             else:
-                png = _png_of(item, doc)
-                if png is None:
+                got = render_picture(
+                    item, doc, fdoc, image_dpi=image_dpi, figure_padding_pt=figure_padding_pt
+                )
+                if got is None:
                     continue
+                png, bbox, sdpi = got
                 # Trang có cache: caption chỉ từ chữ Vision (có thể rỗng); KHÔNG lấy caption ABBYY.
                 caption = text if has_cache else (text or _caption_text(item, doc))
-                blocks.append(ImageBlock(png=png, page=page, caption=caption))
+                blocks.append(
+                    ImageBlock(png=png, page=page, caption=caption, bbox=bbox, source_dpi=sdpi)
+                )
         elif label == "table":
             if has_cache:
                 # Trang CÓ cache: ô bảng lấy chữ Vision (gán theo bbox ô); không có dòng Vision nào
@@ -470,8 +481,7 @@ def _assemble_blocks(
                 dropped += 1 if (has_cache and t is not None) else 0
                 continue
             if blocks and isinstance(blocks[-1], ImageBlock) and not blocks[-1].caption:
-                prev = blocks[-1]
-                blocks[-1] = ImageBlock(png=prev.png, page=prev.page, caption=text)
+                blocks[-1] = dataclasses.replace(blocks[-1], caption=text)
             else:
                 blocks.append(Paragraph(text=text, page=page))
     return blocks, dropped
@@ -561,6 +571,8 @@ def extract_blocks_hybrid(
     *,
     image_scale: float = 2.0,
     text_in_picture_min_chars: int = TEXT_IN_PICTURE_MIN_CHARS,
+    image_dpi: int = 200,
+    figure_padding_pt: float = 4.0,
 ) -> tuple[list[Block], HybridReport]:
     """Trích ``pdf_path`` = **bố cục Docling + chữ Vision (từ ``cache``)**. Cần extra docling.
 
@@ -573,6 +585,7 @@ def extract_blocks_hybrid(
         raise RuntimeError(INSTALL_HINT)
     conv = _build_converter(image_scale)
     doc = conv.convert(str(pdf_path)).document
+    fdoc = fitz.open(str(pdf_path))
 
     # 1) Thu các khối theo thứ tự đọc; khối chữ/picture có bbox → target nhận chữ Vision.
     order_items, targets = _build_targets(doc)
@@ -596,9 +609,18 @@ def extract_blocks_hybrid(
     )
 
     # 5) Dựng blocks: trang có cache chỉ dùng chữ Vision (khối rỗng → bỏ); thiếu cache → fallback.
-    blocks, dropped = _assemble_blocks(
-        order_items, doc, cached_pages, text_in_picture_min_chars=text_in_picture_min_chars
-    )
+    try:
+        blocks, dropped = _assemble_blocks(
+            order_items,
+            doc,
+            cached_pages,
+            text_in_picture_min_chars=text_in_picture_min_chars,
+            fdoc=fdoc,
+            image_dpi=image_dpi,
+            figure_padding_pt=figure_padding_pt,
+        )
+    finally:
+        fdoc.close()
 
     warnings: list[str] = []
     if furniture.removed:

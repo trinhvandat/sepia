@@ -120,6 +120,13 @@ trong khâu OCR nội bộ Docling). Số liệu v4 → v5: [spikes/spike-5-reoc
 
 - **TOC** (`toc.py`): suy heading từ cỡ chữ/độ đậm/vị trí → `<h1>/<h2>`; foliate-js & app EPUB khác tự dựng TOC từ heading + `nav.xhtml`.
 - **Trang ảnh** (US-A6): trang gắn nhãn "ảnh" (hình, sơ đồ, bảng) → render **nguyên trang thành ảnh** nhúng vào EPUB. **Không** cố reflow bảng/sơ đồ. (Chức năng xem lại PDF gốc trong app → giai đoạn sau, US-F4.)
+- **Figure (hình nhỏ trong trang văn bản, đường Docling/hybrid)**: không còn dùng ảnh Docling cắt sẵn
+  (`images_scale=2.0`, ~144 dpi) — figure được **cắt lại thẳng từ trang PDF gốc bằng PyMuPDF**
+  (`sepia_pipeline/image_render.crop_figure`): bbox Docling + padding → clip mép trang → render ở
+  **DPI 200** → trim viền trắng. EPUB giới hạn chiều cao ảnh (`max-height:95vh`/`object-fit:contain`)
+  và phát `<img width/height>` để tránh giật layout; trần cỡ cạnh nâng **1200→1800px** (chỉ
+  downscale, không phóng to), nén **JPEG q82** hoặc **PNG** (line-art) tuỳ nội dung — xem
+  [05-tech-decisions.md](./05-tech-decisions.md) ADR-012.
 
 ## 8. Bước 7 — Dựng EPUB + font + kiểm tra nhẹ
 

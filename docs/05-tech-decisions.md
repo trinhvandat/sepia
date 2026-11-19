@@ -211,6 +211,25 @@ Lý do: tối đa hóa chia sẻ code và né viết Swift/tích hợp 2 toolkit
 
 ---
 
+## ADR-012 — Geometry-aware image rendering: cắt lại figure từ PDF (padding + DPI)
+
+**Bối cảnh:** `ImageBlock` cũ chỉ giữ `png` bytes; ảnh đường Docling/hybrid do Docling cắt sẵn
+ở `images_scale=2.0` (~144 dpi) → không nới viền (cụt hình/dư viền) hay re-render nét hơn được.
+Trang ảnh heuristic render 150 dpi. build_epub chỉ `max-width:100%` → ảnh dọc tràn cao; trần cỡ
+cứng 1200px làm mờ trang scan lớn.
+
+**Quyết định:** `ImageBlock` mang thêm `bbox` + `source_dpi`. Thêm cropper thuần
+`sepia_pipeline/image_render.crop_figure` cắt figure **thẳng từ trang PDF bằng PyMuPDF** (bbox Docling
++ padding → clip mép → render DPI 200 → trim viền trắng), dùng chung cho cả đường Docling và hybrid
+(`render_picture`). build_epub thêm CSS `max-height:95vh`/`object-fit:contain` + `<img width/height>`,
+nâng trần cỡ 1200→1800 (chỉ downscale), JPEG q82 / PNG line-art (core media type EPUB — không WebP).
+
+**Hệ quả:** Tất định (PyMuPDF + PIL PNG không timestamp), offline, không docling trong test.
+Output ảnh đổi ⇒ `PIPELINE_VERSION` 12→13. Content pack có thể nặng hơn (DPI cao) — giảm bằng trần cỡ
++ JPEG. Thứ tự đọc nhiều cột KHÔNG xử lý ở đây (issue #18). Phạm vi: [Spec 2 design](./superpowers/specs/2026-11-18-spec2-images-epub-design.md).
+
+---
+
 ## Nguồn (kiểm tra 2026-10-25)
 - Kotlin / Compose MP: kotlinlang.org/docs/releases.html; kotlinlang.org/docs/multiplatform/compose-compatibility-and-versioning.html
 - Room KMP: developer.android.com/jetpack/androidx/releases/room; developer.android.com/kotlin/multiplatform/room

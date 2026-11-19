@@ -40,7 +40,8 @@ DEFAULT_OUT_DIR = Path(__file__).resolve().parent.parent / "out"
 class ConvertConfig:
     detect: DetectConfig = dataclasses.field(default_factory=DetectConfig)
     reflow: ReflowConfig = dataclasses.field(default_factory=ReflowConfig)
-    image_dpi: int = 150
+    image_dpi: int = 200  # Spec 2: nâng từ 150 → 200 (nét hơn cho trang ảnh + figure)
+    figure_padding_pt: float = 4.0  # Spec 2: nới viền khi cắt figure từ PDF
 
 
 @dataclass(frozen=True)
@@ -224,13 +225,20 @@ def convert_pdf(
     if use_hybrid_ocr:
         from .ocr_hybrid import extract_blocks_hybrid
 
-        blocks, hybrid_report = extract_blocks_hybrid(pdf_path, ocr_cache_obj)
+        blocks, hybrid_report = extract_blocks_hybrid(
+            pdf_path,
+            ocr_cache_obj,
+            image_dpi=config.image_dpi,
+            figure_padding_pt=config.figure_padding_pt,
+        )
         warnings += hybrid_report.warnings
     elif engine_used == "docling":
         # Không có cache → giữ lớp chữ ẩn (Docling + ABBYY) như v4.
         from .docling_adapter import extract_blocks_docling
 
-        blocks = extract_blocks_docling(pdf_path)
+        blocks = extract_blocks_docling(
+            pdf_path, image_dpi=config.image_dpi, figure_padding_pt=config.figure_padding_pt
+        )
     else:
         warnings += collect_warnings(doc_model, config.reflow)
         n_img_pages = sum(1 for p in doc_model.pages if p.is_image_page)

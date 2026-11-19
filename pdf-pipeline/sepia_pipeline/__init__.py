@@ -49,6 +49,10 @@ extract/reflow/build_epub thuộc Mốc 1 (xem docs/07-roadmap.md).
 #      rác: token KHÔNG phải âm tiết Việt hợp lệ → thử bảng nhầm (ocr_confusion.toml) + rửa ký tự
 #      rác; thay khi có ĐÚNG 1 ứng viên hợp lệ (mơ hồ/0 → giữ nguyên). Gate is_ocr_source. → chữ
 #      thân bài đổi.
-PIPELINE_VERSION = 12
+# v13: ẢNH (Spec 2). ImageBlock mang bbox + source_dpi; figure cắt lại THẲNG từ PDF ở DPI 200 +
+#      padding (image_render.crop_figure) thay ảnh Docling ~144 dpi; trim viền trắng. build_epub:
+#      CSS max-height/object-fit + <img width/height>, trần cỡ 1200→1800 (downscale-only), JPEG q82.
+#      → bytes ảnh trong EPUB đổi (cả trang ảnh heuristic do DPI 150→200).
+PIPELINE_VERSION = 13
 
 __all__ = ["PIPELINE_VERSION"]

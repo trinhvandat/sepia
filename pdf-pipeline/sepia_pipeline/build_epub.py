@@ -54,7 +54,8 @@ def _css(font_family: str) -> str:
         f"body {{ font-family: {font_family}; line-height: 1.6; margin: 1em; }}\n"
         "h1, h2, h3 { line-height: 1.3; page-break-after: avoid; }\n"
         "p { margin: 0 0 0.8em; }\n"
-        "img { max-width: 100%; height: auto; }\n"
+        "img { max-width: 100%; max-height: 95vh; width: auto; height: auto;"
+        " object-fit: contain; }\n"
         "figure { margin: 1em 0; text-align: center; }\n"
         "figcaption { font-size: 0.9em; font-style: italic; }\n"
         "table { border-collapse: collapse; margin: 1em 0; width: 100%; table-layout: fixed; }\n"
@@ -73,10 +74,10 @@ _TARGET_CHARS = 7000  # vượt ngưỡng này → tách ở heading coarsest k�
 _MAX_CHARS = 10_000  # trần cứng: vượt → cắt ở ranh giới khối kế tiếp (kể cả giữa chương)
 _NAV_MAX_LEVEL = 3  # v10 (toc_hierarchy): nav tới 3 cấp (chương → mục đánh số → gạch đầu dòng)
 
-# Ảnh: ảnh chụp/scan → JPEG q80, cạnh dài ≤ _IMG_MAX_EDGE; ảnh ít màu (≤ _IMG_PALETTE_MAX màu) giữ
-# PNG. Bỏ ảnh tí hon (cạnh < _IMG_MIN_EDGE px). Pillow là dependency runtime bắt buộc.
-_IMG_MAX_EDGE = 1200
-_IMG_JPEG_QUALITY = 80
+# Ảnh: ảnh chụp/scan → JPEG q82, cạnh dài ≤ _IMG_MAX_EDGE (1800); ảnh ít màu (≤ _IMG_PALETTE_MAX
+# màu) giữ PNG. Bỏ ảnh tí hon (cạnh < _IMG_MIN_EDGE px). Pillow là dependency runtime bắt buộc.
+_IMG_MAX_EDGE = 1800
+_IMG_JPEG_QUALITY = 82
 _IMG_MIN_EDGE = 64
 _IMG_PALETTE_MAX = 256
 
@@ -123,17 +124,18 @@ def _attr(text: str) -> str:
     return html.escape(text, quote=True)
 
 
-def _process_image(png: bytes) -> tuple[bytes, str, str] | None:
-    """Nén/đổi cỡ ảnh → ``(bytes, ext, media_type)`` hoặc ``None`` nếu bỏ (ảnh tí hon).
+def _process_image(png: bytes) -> tuple[bytes, str, str, tuple[int, int] | None] | None:
+    """Nén/đổi cỡ ảnh → ``(bytes, ext, media_type, (w,h)|None)`` hoặc ``None`` nếu bỏ (ảnh tí hon).
 
-    Ảnh ít màu → PNG (optimize); ảnh nhiều màu (chụp/scan) → JPEG q80. Cạnh dài ≤ ``_IMG_MAX_EDGE``.
-    Ảnh không mở/giải mã được (bytes hỏng) → giữ PNG nguyên.
+    Ảnh ít màu → PNG (optimize); ảnh nhiều màu (chụp/scan) → JPEG. Cạnh dài ≤ ``_IMG_MAX_EDGE``
+    (chỉ **downscale**, không phóng to). Bytes hỏng → giữ PNG nguyên (không biết cỡ →
+    ``(w,h)=None``).
     """
     try:
         img = Image.open(io.BytesIO(png))
         img.load()
     except Exception:
-        return png, "png", "image/png"
+        return png, "png", "image/png", None
 
     w, h = img.size
     if max(w, h) < _IMG_MIN_EDGE:
@@ -147,9 +149,9 @@ def _process_image(png: bytes) -> tuple[bytes, str, str] | None:
     out = io.BytesIO()
     if few_colors:
         img.save(out, format="PNG", optimize=True)
-        return out.getvalue(), "png", "image/png"
+        return out.getvalue(), "png", "image/png", img.size
     img.convert("RGB").save(out, format="JPEG", quality=_IMG_JPEG_QUALITY, optimize=True)
-    return out.getvalue(), "jpg", "image/jpeg"
+    return out.getvalue(), "jpg", "image/jpeg", img.size
 
 
 # Bảng từ ``_TABLE_CARD_MIN_COLS`` cột trở lên: hàng đầu coi là tiêu đề, mỗi ô thân mang
@@ -196,11 +198,12 @@ def _block_html(b: Block, images: list[tuple[str, bytes, str]]) -> str:
         # ảnh tí hon → bỏ ảnh; giữ chú thích dạng <p> (figcaption trần ngoài <figure> là HTML lỗi).
         return f"<p>{_esc(b.caption)}</p>" if b.caption else ""
     caption = f"<figcaption>{_esc(b.caption)}</figcaption>" if b.caption else ""
-    data, ext, media_type = processed
+    data, ext, media_type, wh = processed
     name = f"images/img_{len(images):04d}.{ext}"  # tên theo thứ tự duyệt → duy nhất + tất định
     images.append((name, data, media_type))
     alt = _attr(b.caption) if b.caption else f"Trang {b.page}"
-    return f'<figure><img src="{name}" alt="{alt}"/>{caption}</figure>'
+    dims = f' width="{wh[0]}" height="{wh[1]}"' if wh else ""
+    return f'<figure><img src="{name}" alt="{alt}"{dims}/>{caption}</figure>'
 
 
 def _content_len(b: Block) -> int:

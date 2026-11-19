@@ -145,11 +145,18 @@ class Paragraph:
 
 @dataclass(frozen=True)
 class ImageBlock:
-    """Ảnh (trang ảnh US-A6 hoặc hình do Docling cắt) → ``<figure><img>`` + ``<figcaption>``."""
+    """Ảnh (trang ảnh US-A6 hoặc hình do Docling cắt) → ``<figure><img>`` + ``<figcaption>``.
+
+    ``bbox`` = vùng gốc trên trang PDF (point, gốc trên-trái); ``None`` = ảnh nguyên trang.
+    ``source_dpi`` = DPI đã render ra ``png`` (provenance; ``None`` nếu không biết). Cả hai do đường
+    Docling/hybrid ghi khi cắt lại figure từ PDF (Spec 2); build_epub KHÔNG phụ thuộc chúng để dựng.
+    """
 
     png: bytes
     page: int
     caption: str = ""
+    bbox: BBox | None = None
+    source_dpi: int | None = None
 
 
 @dataclass(frozen=True)

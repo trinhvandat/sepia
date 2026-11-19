@@ -8,7 +8,12 @@ import pytest
 from ebooklib import epub
 
 from sepia_pipeline import PIPELINE_VERSION
-from sepia_pipeline.build_epub import _blocks_to_chapters, build_epub, load_font_family
+from sepia_pipeline.build_epub import (
+    _IMG_MAX_EDGE,
+    _blocks_to_chapters,
+    build_epub,
+    load_font_family,
+)
 from sepia_pipeline.model import Document, Heading, ImageBlock, Paragraph
 
 
@@ -253,7 +258,7 @@ def test_font_profile_written_to_css(tmp_path: Path) -> None:
     assert "Literata" in css
 
 
-def _photo_png(w: int = 1600, h: int = 400) -> bytes:
+def _photo_png(w: int = 2400, h: int = 600) -> bytes:
     # Ảnh nhiều màu (gradient) → bị coi là ảnh chụp → JPEG + resize.
     import pymupdf as fitz
 
@@ -276,7 +281,7 @@ def test_large_photo_becomes_jpeg_and_resized(tmp_path: Path) -> None:
         from PIL import Image
 
         im = Image.open(io.BytesIO(z.read(imgs[0])))
-        assert max(im.size) <= 1200  # đã đổi cỡ
+        assert max(im.size) == _IMG_MAX_EDGE  # đã đổi cỡ tới trần
 
 
 def test_tiny_image_dropped(tmp_path: Path) -> None:

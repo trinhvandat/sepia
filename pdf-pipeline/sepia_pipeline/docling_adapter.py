@@ -7,6 +7,7 @@ lại). Optional extra (``uv sync --extra docling``); thiếu thì :func:`doclin
 
 from __future__ import annotations
 
+import dataclasses
 import importlib.util
 import re
 from io import BytesIO
@@ -14,7 +15,8 @@ from pathlib import Path
 
 import pymupdf as fitz
 
-from .model import Block, Heading, ImageBlock, Paragraph, Table
+from .image_render import crop_figure
+from .model import BBox, Block, Heading, ImageBlock, Paragraph, Table
 from .reflow import normalize_text
 
 # Picture của Docling có > ngưỡng này ký tự lớp-chữ PDF trong bbox → coi là KHUNG CHỮ (xuất text,
@@ -57,6 +59,43 @@ def _png_of(item, doc) -> bytes | None:
     buf = BytesIO()
     img.save(buf, format="PNG")  # PIL PNG không nhúng thời gian → tất định
     return buf.getvalue()
+
+
+def _picture_rect(item, fdoc) -> tuple[fitz.Page, BBox] | None:
+    """Trang PyMuPDF + bbox (point, gốc trên-trái) của một picture Docling.
+
+    ``None`` nếu thiếu toạ độ.
+    """
+    prov = getattr(item, "prov", None)
+    if not prov or fdoc is None:
+        return None
+    page_no = int(getattr(prov[0], "page_no", 0) or 0)
+    if page_no < 1 or page_no > fdoc.page_count:
+        return None
+    page = fdoc[page_no - 1]
+    h = page.rect.height
+    bb = prov[0].bbox
+    try:
+        tl = bb.to_top_left_origin(page_height=h)
+        rect: BBox = (tl.l, tl.t, tl.r, tl.b)
+    except Exception:
+        rect = (bb.l, h - bb.t, bb.r, h - bb.b)
+    return page, rect
+
+
+def render_picture(
+    item, doc, fdoc, *, image_dpi: int, figure_padding_pt: float
+) -> tuple[bytes, BBox | None, int | None] | None:
+    """Ảnh figure: cắt lại từ PDF (nét + nới viền) nếu có toạ độ; không thì fallback ảnh Docling."""
+    rect_info = _picture_rect(item, fdoc)
+    if rect_info is not None:
+        page_obj, bbox = rect_info
+        png, _wh = crop_figure(page_obj, bbox, dpi=image_dpi, padding_pt=figure_padding_pt)
+        return png, bbox, image_dpi
+    png = _png_of(item, doc)
+    if png is None:
+        return None
+    return png, None, None
 
 
 def _table_rows(item) -> tuple[tuple[str, ...], ...]:
@@ -132,8 +171,17 @@ def _picture_clip_text(item, fdoc: fitz.Document) -> str:
         return ""
 
 
-def _picture_blocks(item, doc, fdoc, page: int, min_chars: int) -> list[Block]:
-    """Xử lý một picture: khung chữ → đoạn văn; hình có nhãn ngắn → ảnh + caption."""
+def _picture_blocks(
+    item,
+    doc,
+    fdoc,
+    page: int,
+    min_chars: int,
+    *,
+    image_dpi: int,
+    figure_padding_pt: float,
+) -> list[Block]:
+    """Xử lý một picture: khung chữ → đoạn văn; hình nhãn ngắn → ảnh (cắt lại từ PDF) + caption."""
     clip_text = _picture_clip_text(item, fdoc)
     if _non_space_len(clip_text) >= min_chars:
         # KHUNG CHỮ: xuất phần chữ (giữ ngắt đoạn trong khung), KHÔNG chèn ảnh (chữ mới là nội dung;
@@ -146,11 +194,12 @@ def _picture_blocks(item, doc, fdoc, page: int, min_chars: int) -> list[Block]:
         if blocks:
             return blocks
     # Hình có nhãn ngắn (hoặc không trích được chữ): giữ ảnh, nhãn vào caption để vẫn tìm được.
-    png = _png_of(item, doc)
-    if png is None:
+    got = render_picture(item, doc, fdoc, image_dpi=image_dpi, figure_padding_pt=figure_padding_pt)
+    if got is None:
         return []
+    png, bbox, sdpi = got
     caption = _caption_text(item, doc) or normalize_text(clip_text)
-    return [ImageBlock(png=png, page=page, caption=caption)]
+    return [ImageBlock(png=png, page=page, caption=caption, bbox=bbox, source_dpi=sdpi)]
 
 
 def _build_converter(image_scale: float):
@@ -172,6 +221,8 @@ def extract_blocks_docling(
     *,
     image_scale: float = 2.0,
     text_in_picture_min_chars: int = TEXT_IN_PICTURE_MIN_CHARS,
+    image_dpi: int = 200,
+    figure_padding_pt: float = 4.0,
 ) -> list[Block]:
     """Trích ``pdf_path`` bằng Docling → danh sách ``Block`` theo thứ tự đọc.
 
@@ -201,7 +252,17 @@ def extract_blocks_docling(
                     Heading(text=text, level=level, page=page, top_ratio=_top_ratio(item, fdoc))
                 )
             elif label == "picture":
-                blocks.extend(_picture_blocks(item, doc, fdoc, page, text_in_picture_min_chars))
+                blocks.extend(
+                    _picture_blocks(
+                        item,
+                        doc,
+                        fdoc,
+                        page,
+                        text_in_picture_min_chars,
+                        image_dpi=image_dpi,
+                        figure_padding_pt=figure_padding_pt,
+                    )
+                )
             elif label == "table":
                 rows = _table_rows(item)
                 if rows:
@@ -215,8 +276,7 @@ def extract_blocks_docling(
                     and isinstance(blocks[-1], ImageBlock)
                     and not blocks[-1].caption
                 ):
-                    prev = blocks[-1]
-                    blocks[-1] = ImageBlock(png=prev.png, page=prev.page, caption=text)
+                    blocks[-1] = dataclasses.replace(blocks[-1], caption=text)
                 elif text:
                     blocks.append(Paragraph(text=text, page=page))
             elif label in _PARA_LABELS:

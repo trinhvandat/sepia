@@ -48,3 +48,74 @@ def test_is_real_body() -> None:
     )
     # Heading không bao giờ là biên
     assert not _is_real_body(Heading(text="x" * 80 + " đoạn", level=1, page=1), cfg)
+
+
+def _real_book_blocks() -> list:
+    # Mô phỏng chap_0001: mở đầu thật → MỰC LỰC → mục vỡ + tên chương lặp → thân bài thật.
+    return [
+        Heading(text="LỜI NÓI ĐẦU", level=1, page=1),
+        Paragraph(
+            text="Đông y là kết tinh của kinh nghiệm phòng và chữa bệnh suốt mấy nghìn năm qua",
+            page=1,
+        ),
+        Heading(text="MỰC LỰC", level=1, page=2),  # mốc (OCR méo)
+        Paragraph(text="16-17 Dưỡng sinh mùa thu -. . Dưỡng sinh mùa đông .. 18-19", page=2),
+        Heading(text="Chương 1", level=1, page=2),
+        Heading(text="BƯỚC VÀO THẾ GIỚI ĐÔNG Y", level=1, page=2),
+        Paragraph(text="10. Bệnh tật là cuộc chiến giữa chính khí và tà khí", page=2),
+        Paragraph(text="46", page=2),
+        Paragraph(
+            text="7. Cách phân biệt thuốc Đông y thật giả 74 • •• • 8. Những kiêng kỵ y . 76",
+            page=2,
+        ),
+        Paragraph(
+            text=(
+                "Mùa xuân là khoảng thời gian từ tiết Lập xuân tới tiết Lập hạ, "
+                "tức là các tháng giêng hai ba"
+            ),
+            page=3,
+        ),
+    ]
+
+
+def test_mechanism4_drops_toc_region_keeps_real() -> None:
+    from sepia_pipeline.reflow import drop_printed_toc
+
+    kept, removed = drop_printed_toc(_real_book_blocks())
+    texts = [getattr(b, "text", "") for b in kept]
+    # Giữ mở đầu thật + thân bài thật
+    assert "LỜI NÓI ĐẦU" in texts
+    assert any(t.startswith("Đông y là kết tinh") for t in texts)
+    assert any(t.startswith("Mùa xuân là khoảng") for t in texts)
+    # Bỏ mốc + mục + tên chương lặp
+    assert not any(_ascii_fold(t).strip() == "MUC LUC" for t in texts)
+    assert "Chương 1" not in texts
+    assert "BƯỚC VÀO THẾ GIỚI ĐÔNG Y" not in texts
+    assert "46" not in texts
+    assert not any(t.startswith("10. Bệnh tật") for t in texts)
+
+
+def test_mechanism4_no_marker_unchanged() -> None:
+    from sepia_pipeline.reflow import drop_printed_toc
+
+    blocks = [
+        Paragraph(
+            text="Một đoạn văn xuôi bình thường không có mục lục gì ở đây cả nhé bạn ơi", page=1
+        ),
+        Heading(text="Chương 1", level=1, page=1),
+        Paragraph(
+            text="Nội dung chương một kể về nhiều thứ rất hay và bổ ích cho người đọc", page=1
+        ),
+    ]
+    kept, removed = drop_printed_toc(blocks)
+    assert len(kept) == 3  # không mốc → nguyên vẹn
+
+
+def test_mechanism4_cap_prevents_runaway() -> None:
+    from sepia_pipeline.reflow import ReflowConfig, drop_printed_toc
+
+    # Mốc nhưng KHÔNG có biên văn xuôi thật trong cap nhỏ → KHÔNG bỏ gì (an toàn).
+    blocks = [Heading(text="MỤC LỤC", level=1, page=1)]
+    blocks += [Paragraph(text="x", page=1) for _ in range(5)]  # toàn khối ngắn, không biên
+    kept, removed = drop_printed_toc(blocks, ReflowConfig(toc_region_max_blocks=3))
+    assert len(kept) == len(blocks)  # cap chặn: không gặp biên → giữ hết

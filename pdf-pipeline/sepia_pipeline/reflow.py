@@ -464,6 +464,25 @@ def drop_printed_toc(
             for k in toc_idxs:
                 drop[k] = True
 
+    # 4) Vùng neo mốc "MỤC LỤC": từ mỗi mốc, bỏ tới khi gặp văn xuôi thật (_is_real_body). Cap
+    #    toc_region_max_blocks chặn ăn lan: quét hết cap chưa gặp biên → KHÔNG bỏ (an toàn).
+    n = len(blocks)
+    i = 0
+    while i < n:
+        if _is_toc_marker(blocks[i]):
+            end = None
+            limit = min(n, i + 1 + config.toc_region_max_blocks)
+            for j in range(i + 1, limit):
+                if _is_real_body(blocks[j], config):
+                    end = j
+                    break
+            if end is not None:
+                for k in range(i, end):
+                    drop[k] = True
+                i = end
+                continue
+        i += 1
+
     removed = sum(flags[k][1] for k in range(len(blocks)) if drop[k])
     kept = [b for b, d in zip(blocks, drop, strict=True) if not d]
     return kept, removed

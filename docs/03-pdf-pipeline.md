@@ -119,6 +119,7 @@ trong khâu OCR nội bộ Docling). Số liệu v4 → v5: [spikes/spike-5-reoc
 ## 7. Bước 5 — Mục lục & Bước 6 — Giữ trang ảnh
 
 - **TOC** (`toc.py`): suy heading từ cỡ chữ/độ đậm/vị trí → `<h1>/<h2>`; foliate-js & app EPUB khác tự dựng TOC từ heading + `nav.xhtml`.
+  - **Cơ chế 4 — `drop_printed_toc` (PIPELINE_VERSION 14)**: Mục lục OCR-vỡ (số trang đứng riêng, mục không dấu-dẫn, tên chương lặp) không khớp 3 cơ chế cũ → **neo theo mốc "MỤC LỤC"** (chuẩn hoá bỏ dấu, chịu lỗi dấu chẳng hạn `MỰC LỰC`), **bỏ cả vùng mục lục tới khi gặp văn xuôi thật** (≥60 ký tự không-space, có chữ thường), **cap 60 khối chống ăn lan** (nếu không tìm biên văn xuôi → giữ hết, an toàn), chỉ chạy khi **có mốc "MỤC LỤC"** hiện diện.
 - **Trang ảnh** (US-A6): trang gắn nhãn "ảnh" (hình, sơ đồ, bảng) → render **nguyên trang thành ảnh** nhúng vào EPUB. **Không** cố reflow bảng/sơ đồ. (Chức năng xem lại PDF gốc trong app → giai đoạn sau, US-F4.)
 - **Figure (hình nhỏ trong trang văn bản, đường Docling/hybrid)**: không còn dùng ảnh Docling cắt sẵn
   (`images_scale=2.0`, ~144 dpi) — figure được **cắt lại thẳng từ trang PDF gốc bằng PyMuPDF**

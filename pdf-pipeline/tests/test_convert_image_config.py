@@ -1,4 +1,4 @@
-"""Spec 2: default DPI ảnh = 200, có figure_padding_pt; PIPELINE_VERSION = 13."""
+"""Spec 2: default DPI ảnh = 200, có figure_padding_pt; PIPELINE_VERSION = 14."""
 
 from __future__ import annotations
 
@@ -15,4 +15,4 @@ def test_figure_padding_default() -> None:
 
 
 def test_pipeline_version_bumped() -> None:
-    assert PIPELINE_VERSION == 13
+    assert PIPELINE_VERSION == 14

@@ -78,6 +78,9 @@ class ReflowConfig:
 
 # Dấu kết câu (docs/03 §6). Các ký tự đóng (ngoặc/nháy) được "trong suốt": bỏ ở cuối rồi mới xét.
 _SENTENCE_ENDERS = frozenset(".!?…:")
+_STRONG_SENTENCE_ENDERS = frozenset(
+    ".!?…"
+)  # kết câu THẬT — loại ':' (tiêu đề/mục lục hay kết bằng ':')
 _TRAILING_CLOSERS = "”’\"')]》»"
 _PAGE_NUMBER_RE = re.compile(
     r"""^\s*
@@ -106,6 +109,15 @@ def ends_sentence(text: str) -> bool:
     while s and s[-1] in _TRAILING_CLOSERS:
         s = s[:-1].rstrip()
     return bool(s) and s[-1] in _SENTENCE_ENDERS
+
+
+def _ends_strong_sentence(text: str) -> bool:
+    """Như :func:`ends_sentence` nhưng KHÔNG tính ':' — phân biệt văn xuôi thật (kết . ! ? …) với
+    tiêu đề/mục lục kết bằng ':'. Dùng cho biên vùng mục lục (cơ chế 4)."""
+    s = text.rstrip()
+    while s and s[-1] in _TRAILING_CLOSERS:
+        s = s[:-1].rstrip()
+    return bool(s) and s[-1] in _STRONG_SENTENCE_ENDERS
 
 
 def is_page_number_line(text: str) -> bool:
@@ -406,6 +418,8 @@ def _is_real_body(block: Block, config: ReflowConfig) -> bool:
     if _is_toc_entry_text(text) or is_page_number_line(text):
         return False
     if _non_space_len(text) < config.toc_body_min_chars:
+        return False
+    if not _ends_strong_sentence(text):
         return False
     return any(ch.islower() for ch in text)
 

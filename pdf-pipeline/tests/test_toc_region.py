@@ -33,7 +33,7 @@ def test_is_real_body() -> None:
     real = Paragraph(
         text=(
             "Mùa xuân là khoảng thời gian từ tiết Lập xuân tới tiết Lập hạ "
-            "rất là quan trọng đối với nông dân"
+            "rất là quan trọng đối với nông dân."
         ),
         page=1,
     )
@@ -48,6 +48,19 @@ def test_is_real_body() -> None:
     )
     # Heading không bao giờ là biên
     assert not _is_real_body(Heading(text="x" * 80 + " đoạn", level=1, page=1), cfg)
+    # Dài, chữ thường, nhưng kết bằng ':' (dạng tiêu đề chương) → không phải biên (kết câu THẬT)
+    assert not _is_real_body(
+        Paragraph(text="Những điều cần biết trước khi bước vào thế giới đông y cổ truyền:", page=1),
+        cfg,
+    )
+    # Dài, chữ thường, nhưng kết bằng số trang (không có dấu kết câu) → không phải biên
+    assert not _is_real_body(
+        Paragraph(
+            text="Những điều cần biết trước khi bước vào thế giới đông y cổ truyền trang 76",
+            page=1,
+        ),
+        cfg,
+    )
 
 
 def _real_book_blocks() -> list:
@@ -71,7 +84,7 @@ def _real_book_blocks() -> list:
         Paragraph(
             text=(
                 "Mùa xuân là khoảng thời gian từ tiết Lập xuân tới tiết Lập hạ, "
-                "tức là các tháng giêng hai ba"
+                "tức là các tháng giêng hai ba."
             ),
             page=3,
         ),
@@ -93,11 +106,34 @@ def test_mechanism4_drops_toc_region_keeps_real() -> None:
     assert "BƯỚC VÀO THẾ GIỚI ĐÔNG Y" not in texts
     assert "46" not in texts
     assert not any(t.startswith("10. Bệnh tật") for t in texts)
-    # GIỚI HẠN ĐÃ BIẾT (spec §7 rủi ro #1, hướng AN TOÀN): dòng mục lục run-on dạng văn xuôi
-    # (≥60 ký tự không-khoảng-trắng, chữ thường, không khớp _is_toc_entry_text) bị chặn ở ngưỡng
-    # _non_space_len → không trở thành biên, bỏ cùng vùng mục lục. Assert rõ để giới hạn này không
-    # bị che: nếu sau đó nới ngưỡng, dòng sẽ lọt → cần kiểm tra kỹ hơn trước khi thay đổi.
-    assert not any(t.startswith("7. Cách phân biệt") for t in texts)  # dòng này bị bỏ (< 60 ký tự)
+    # GIỚI HẠN ĐÃ BIẾT (spec §7 rủi ro #1, hướng AN TOÀN): dòng mục lục run-on dạng văn xuôi, dù dài
+    # và có chữ thường, KHÔNG kết thúc bằng dấu kết câu THẬT (. ! ? …) — nó kết bằng số trang/dấu
+    # chấm rời rạc ("• •• • ... 76") — nên không thoả _ends_strong_sentence và không trở thành
+    # biên; bị bỏ cùng vùng mục lục. Assert rõ để giới hạn này không bị che: nếu sau đó nới điều
+    # kiện, dòng sẽ lọt → cần kiểm tra kỹ hơn trước khi thay đổi.
+    assert not any(t.startswith("7. Cách phân biệt") for t in texts)
+
+
+def test_mechanism4_colon_paragraph_does_not_end_region_but_period_does() -> None:
+    """Đoạn kết bằng ':' (dạng tiêu đề) KHÔNG kết thúc vùng mục lục (bị bỏ cùng vùng); đoạn kết
+    bằng '.' ngay sau đó mới là biên văn xuôi thật → dừng bỏ, được giữ."""
+    from sepia_pipeline.reflow import drop_printed_toc
+
+    blocks = [
+        Heading(text="MỤC LỤC", level=1, page=1),
+        Paragraph(text="16-17 Dưỡng sinh mùa thu -. . Dưỡng sinh mùa đông .. 18-19", page=1),
+        Paragraph(text="Những điều cần biết trước khi bước vào thế giới đông y cổ truyền:", page=1),
+        Paragraph(
+            text=("Đông y là kết tinh của kinh nghiệm phòng và chữa bệnh suốt mấy nghìn năm qua."),
+            page=2,
+        ),
+    ]
+    kept, removed = drop_printed_toc(blocks)
+    texts = [getattr(b, "text", "") for b in kept]
+    # Đoạn kết ':' bị bỏ cùng vùng mục lục (không phải biên)
+    assert not any(t.startswith("Những điều cần biết") for t in texts)
+    # Đoạn kết '.' ngay sau đó là biên thật → được giữ
+    assert any(t.startswith("Đông y là kết tinh") for t in texts)
 
 
 def test_mechanism4_no_marker_unchanged() -> None:
